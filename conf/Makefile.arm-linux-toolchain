@@ -6,12 +6,13 @@
 # Minimal makefile for arm-linux-gnueabi or arm-none-linux-gnueabi toolchain.
 # Assuming installed in default location.
 
-PREFIX ?= arm-linux-gnueabihf
+# PREFIX ?= arm-linux-gnueabihf
+PREFIX ?= arm-linux-gnueabi
 
 #
 # if gcc can't be found in path, try the codesourcery toolchain in /usr/local/codesourcery
 #
-ifeq ($(shell which $(PREFIX)-gcc-4.7),)
+ifeq ($(shell which $(PREFIX)-gcc-4.6),)
   TOOLCHAIN=$(shell find -L /usr/local/codesourcery -maxdepth 2 -type d -name arm-none-linux-gnueabi 2>/dev/null | head -n 1)
   ifneq ($(TOOLCHAIN),)
     PREFIX=$(shell dirname $(TOOLCHAIN))/bin/arm-none-linux-gnueabi
@@ -24,9 +25,9 @@ else
   #CFLAGS += -I/usr/arm-linux-gnueabi/include
 endif
 
-CC   = $(PREFIX)-gcc-4.7
-LD   = $(PREFIX)-gcc-4.7
-AR   = $(PREFIX)-ar-4.7
+CC   = $(PREFIX)-gcc-4.6
+LD   = $(PREFIX)-gcc-4.6
+AR   = $(PREFIX)-ar-4.6
 CP   = $(PREFIX)-objcopy
 DMP  = $(PREFIX)-objdump
 NM   = $(PREFIX)-nm
