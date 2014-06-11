@@ -12,12 +12,14 @@
 
   <firmware name="rotorcraft">
     <target name="ap" board="lisa_m_2.0">
+      <configure name="LISA_M_BARO" value="BARO_MS5611_SPI"/>
       <subsystem name="radio_control" type="spektrum">
         <define name="RADIO_MODE" value="RADIO_AUX1"/>
       <!-- <define name="RADIO_KILL_SWITCH" value="RADIO_FLAPS"/> -->
       <!-- <define name="USE_KILL_SWITCH_FOR_MOTOR_ARMING" value="1"/> -->
 
-        <!-- <configure name="USE_SECONDARY_SPEKTRUM_RECEIVER" value="1"/> -->
+        <!-- <configure name="USE_SECONDARY_SPEKTRUM_RECEIVER"
+             value="1"/> -->
       </subsystem>
       <!-- MPU6000 is configured to output data at 2kHz, but polled at 512Hz PERIODIC_FREQUENCY -->
     </target>
@@ -34,10 +36,12 @@
     </subsystem>
 
     <subsystem name="telemetry"     type="transparent"/>
-    <subsystem name="imu"           type="aspirin_v2.1"/>
+    <!-- <subsystem name="imu"           type="aspirin_v2.1"/> -->
+    <subsystem name="imu"           type="aspirin_v2.2"/>
     <subsystem name="gps"           type="ublox"/>
     <subsystem name="stabilization" type="int_quat"/>
     <subsystem name="ahrs"          type="int_cmpl_quat">
+      <configure name="USE_MAGNETOMETER" value="TRUE"/>
       <define name="AHRS_GRAVITY_HEURISTIC_FACTOR" value="30"/>
     </subsystem>
     <subsystem name="ins"/>
@@ -235,29 +239,45 @@
     <define name="REF_MAX_QDOT" value="RadOfDeg(8000.)"/>
 
     <!-- <define name="REF_OMEGA_R"  value="250" unit="deg/s"/> -->
-    <define name="REF_OMEGA_R"  value="350" unit="deg/s"/>
+    <!-- <define name="REF_OMEGA_R"  value="350" unit="deg/s"/> -->
+    <define name="REF_OMEGA_R"  value="1080" unit="deg/s"/>
     <define name="REF_ZETA_R"   value="0.85"/>
     <!-- <define name="REF_MAX_R"    value="180." unit="deg/s"/> -->
-    <define name="REF_MAX_R"    value="400." unit="deg/s"/>
+    <define name="REF_MAX_R"    value="1200." unit="deg/s"/>
     <define name="REF_MAX_RDOT" value="RadOfDeg(1800.)"/>
 
     <!-- feedback -->
-    <define name="PHI_PGAIN"  value="1500"/> <!-- P 200 up, D 400 down, I 0 or small, DD < P -->
+    <!-- P 200 up, D 400 down, I 0 or small, DD < P -->
+    <!-- <define name="PHI_PGAIN"  value="1500"/> -->
+    <!-- <define name="PHI_DGAIN"  value="450"/> -->
+    <!-- <define name="PHI_IGAIN"  value="120"/> -->
+
+    <!-- <define name="THETA_PGAIN"  value="1500"/> -->
+    <!-- 400 -->
+    <!-- <define name="THETA_DGAIN"  value="450"/> -->
+    <!-- <define name="THETA_IGAIN"  value="120"/> -->
+
+    <!-- <define name="PSI_PGAIN"  value="500"/> -->
+    <!-- 300 -->
+    <!-- <define name="PSI_DGAIN"  value="0"/> -->
+    <!-- <define name="PSI_IGAIN"  value="10"/> -->
+
+    <define name="PHI_PGAIN"  value="450"/> <!-- P 200 up, D 400 down, I 0 or small, DD < P -->
     <define name="PHI_DGAIN"  value="450"/>
-    <define name="PHI_IGAIN"  value="120"/>
+    <define name="PHI_IGAIN"  value="60"/>
 
-    <define name="THETA_PGAIN"  value="1500"/>
+    <define name="THETA_PGAIN"  value="450"/>
     <define name="THETA_DGAIN"  value="450"/> <!-- 400 -->
-    <define name="THETA_IGAIN"  value="120"/>
+    <define name="THETA_IGAIN"  value="60"/>
 
-    <define name="PSI_PGAIN"  value="500"/>
-    <define name="PSI_DGAIN"  value="0"/> <!-- 300 -->
-    <define name="PSI_IGAIN"  value="10"/>
+    <define name="PSI_PGAIN"  value="480"/>
+    <define name="PSI_DGAIN"  value="200"/> <!-- 300 -->
+    <define name="PSI_IGAIN"  value="20"/>
 
     <!-- feedforward -->
-    <define name="PHI_DDGAIN"   value="300"/>
-    <define name="THETA_DDGAIN" value="300"/>
-    <define name="PSI_DDGAIN"   value="300"/>
+    <define name="PHI_DDGAIN"   value="160"/>
+    <define name="THETA_DDGAIN" value="160"/>
+    <define name="PSI_DDGAIN"   value="250"/>
   </section>
 
   <section name="GUIDANCE_V" prefix="GUIDANCE_V_">
@@ -270,7 +290,8 @@
     <define name="HOVER_KD"    value="80"/>
     <define name="HOVER_KI"    value="20"/>
     <define name="NOMINAL_HOVER_THROTTLE" value="0.5"/>
-    <define name="ADAPT_THROTTLE_ENABLED" value="TRUE"/>
+    <!-- <define name="ADAPT_THROTTLE_ENABLED" value="TRUE"/> -->
+    <define name="ADAPT_THROTTLE_ENABLED" value="FALSE"/>
   </section>
 
   <section name="GUIDANCE_H" prefix="GUIDANCE_H_">
