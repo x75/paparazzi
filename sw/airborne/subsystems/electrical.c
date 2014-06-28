@@ -119,7 +119,8 @@ void electrical_periodic(void) {
 
 #ifdef ADC_CHANNEL_CURRENT
 #ifndef SITL
-  electrical.current = MilliAmpereOfAdc((electrical_priv.current_adc_buf.sum/electrical_priv.current_adc_buf.av_nb_sample));
+  int32_t current_adc = electrical_priv.current_adc_buf.sum/electrical_priv.current_adc_buf.av_nb_sample;
+  electrical.current = MilliAmpereOfAdc(current_adc);
   /* Prevent an overflow on high current spikes when using the motor brake */
   BoundAbs(electrical.current, 65000);
 #endif
@@ -147,7 +148,7 @@ void electrical_periodic(void) {
 
   /*if valid voltage is seen then start checking. Set min level to 0 to always start*/
   if (electrical.vsupply >= MIN_BAT_LEVEL * 10) {
-      vsupply_check_started = TRUE;
+    vsupply_check_started = TRUE;
   }
 
   if (vsupply_check_started) {

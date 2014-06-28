@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 The Paparazzi Team
+ * Copyright (C) 2014 Gautier Hattenberger
  *
  * This file is part of paparazzi.
  *
@@ -21,18 +21,16 @@
  */
 
 /**
- * @file arch/lpc21/mcu_periph/pwm_input_arch.h
- * @ingroup lpc21_arch
+ * @file arch/stm32/mcu_periph/pwm_input_arch.h
+ * @ingroup stm32_arch
  *
- * handling of arm7 PWM input using a timer with capture.
+ * handling of smt32 PWM input using a timer with capture.
  */
 
 #ifndef PWM_INPUT_ARCH_H
 #define PWM_INPUT_ARCH_H
 
 #include "std.h"
-#include "LPC21xx.h"
-#include "interrupt_hw.h"
 
 enum pwm_input_channels {
   PWM_INPUT1,
@@ -40,18 +38,24 @@ enum pwm_input_channels {
   PWM_INPUT_NB
 };
 
+/**
+ * The pwm counter is set-up to have 1/6 us resolution.
+ *
+ * The timer clock frequency (before prescaling):
+ * STM32F1:
+ *   TIM1 -> APB2 = HCLK = 72MHz
+ *   TIM2 -> 2 * APB1 = 2 * 36MHz = 72MHz
+ * STM32F4:
+ *   TIM1 -> 2 * APB2 = 2 * 84MHz = 168MHz
+ *   TIM2 -> 2 * APB1 = 2 * 42MHz = 84MHz
+ */
+#define PWM_INPUT_TICKS_PER_USEC 6
+
+#define PWM_INPUT_TICKS_OF_USEC(_v)        ((_v)*PWM_INPUT_TICKS_PER_USEC)
+#define PWM_INPUT_SIGNED_TICKS_OF_USEC(_v) (int32_t)((_v)*PWM_INPUT_TICKS_PER_USEC)
+#define USEC_OF_PWM_INPUT_TICKS(_v)        ((_v)/PWM_INPUT_TICKS_PER_USEC)
+
 #include "mcu_periph/pwm_input.h"
 
-#ifdef USE_PWM_INPUT1
-extern void pwm_input_isr1(void);
-#define PWM_INPUT_IT1 TIR_CR3I
-#define PWM_INPUT_ISR_1() pwm_input_isr1()
-#endif //USE_PWM_INPUT1
-
-#ifdef USE_PWM_INPUT2
-extern void pwm_input_isr2(void);
-#define PWM_INPUT_IT2 TIR_CR0I
-#define PWM_INPUT_ISR_2() pwm_input_isr2()
-#endif //USE_PWM_INPUT2
-
 #endif /* PWM_INPUT_ARCH_H */
+
