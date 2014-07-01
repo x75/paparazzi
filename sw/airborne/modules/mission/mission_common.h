@@ -27,8 +27,8 @@
  *  Handle the parsing of datalink messages
  */
 
-#ifndef MISSION_H
-#define MISSION_H
+#ifndef MISSION_COMMON_H
+#define MISSION_COMMON_H
 
 #include "std.h"
 #include "math/pprz_geodetic_float.h"
@@ -119,7 +119,7 @@ struct _mission {
 extern struct _mission mission;
 
 /** Init mission structure
- */
+*/
 extern void mission_init(void);
 
 /** Insert a mission element according to the insertion mode
@@ -129,16 +129,25 @@ extern void mission_init(void);
  */
 extern bool_t mission_insert(enum MissionInsertMode insert, struct _mission_element * element);
 
+/** Convert mission element's points format if needed
+ * @param el pointer to the mission element
+ * @return return TRUE if conversion is succesful, FALSE otherwise
+ */
+extern bool_t mission_element_convert(struct _mission_element * el);
+
 /** Get current mission element
  * @return return a pointer to the next mission element or NULL if no more elements
  */
 extern struct _mission_element * mission_get(void);
 
 /** Get the ENU component of LLA mission point
- * 
+ * This function is firmware specific.
+ * @param point pointer to the output ENU point
+ * @param lla pointer to the input LLA coordinate
+ * @return TRUE if conversion is succesful, FALSE otherwise
  */
 extern bool_t mission_point_of_lla(struct EnuCoor_f *point, struct LlaCoor_f *lla);
- 
+
 /** Run mission
  *
  * This function should be implemented into a dedicated file since
@@ -157,7 +166,7 @@ extern int mission_run(void);
 extern void mission_status_report(void);
 
 /** Parsing functions called when a mission message is received
- */
+*/
 extern int mission_parse_GOTO_WP(void);
 extern int mission_parse_GOTO_WP_LLA(void);
 extern int mission_parse_CIRCLE(void);
@@ -172,8 +181,5 @@ extern int mission_parse_GOTO_MISSION(void);
 extern int mission_parse_NEXT_MISSION(void);
 extern int mission_parse_END_MISSION(void);
 
-/** Status report messages
- * @todo
- */
+#endif // MISSION_COMMON_H
 
-#endif // MISSION

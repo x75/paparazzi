@@ -31,6 +31,32 @@
 #include "modules/mission/mission_common.h"
 #include "firmwares/fixedwing/autopilot.h"
 #include "firmwares/fixedwing/nav.h"
+#include "subsystems/navigation/common_nav.h"
+#include "generated/flight_plan.h"
+
+// Utility function: converts lla to local point
+bool_t mission_point_of_lla(struct EnuCoor_f *point, struct LlaCoor_f *lla) {
+  /* Computes from (lat, long) in the referenced UTM zone */
+  struct UtmCoor_f utm;
+  utm.zone = nav_utm_zone0;
+  utm_of_lla_f(&utm, lla);
+
+  /* Computes relative position to HOME waypoint
+   * and bound the distance to max_dist_from_home
+   */
+  float dx, dy;
+  dx = utm.east - nav_utm_east0 - waypoints[WP_HOME].x;
+  dy = utm.north - nav_utm_north0 - waypoints[WP_HOME].y;
+  BoundAbs(dx, max_dist_from_home);
+  BoundAbs(dy, max_dist_from_home);
+
+  /* Update point */
+  point->x = waypoints[WP_HOME].x + dx;
+  point->y = waypoints[WP_HOME].y + dy;
+  point->z = lla->alt;
+
+ return TRUE;
+}
 
 // navigation time step
 const float dt_navigation = 1.0 / ((float)NAVIGATION_FREQUENCY);
@@ -138,7 +164,7 @@ int mission_run() {
     // reset timer
     mission.element_time = 0.;
     // go to next element
-    mission.current_idx++;
+    mission.current_idx = (mission.current_idx + 1) % MISSION_ELEMENT_NB;
   }
 
   return TRUE;
