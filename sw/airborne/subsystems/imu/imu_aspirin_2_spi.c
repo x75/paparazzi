@@ -27,6 +27,7 @@
 #include "subsystems/imu.h"
 
 #include "mcu_periph/spi.h"
+#include "mcu_periph/sys_time.h"
 #include "peripherals/hmc58xx_regs.h"
 
 /* defaults suitable for Lisa */
@@ -216,6 +217,9 @@ static inline void mpu_set_and_wait(Mpu60x0ConfigSet mpu_set, void* mpu, uint8_t
  */
 bool_t imu_aspirin2_configure_mag_slave(Mpu60x0ConfigSet mpu_set, void* mpu)
 {
+  // wait for hmc5883 to come up before configuring, gautier / joshua 20140706
+  sys_time_usleep(2000000);
+
   mpu_set_and_wait(mpu_set, mpu, MPU60X0_REG_I2C_SLV4_ADDR, (HMC58XX_ADDR >> 1));
   mpu_set_and_wait(mpu_set, mpu, MPU60X0_REG_I2C_SLV4_REG, HMC58XX_REG_CFGA);
   mpu_set_and_wait(mpu_set, mpu, MPU60X0_REG_I2C_SLV4_DO, HMC58XX_CRA);
