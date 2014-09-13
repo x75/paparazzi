@@ -42,7 +42,9 @@
 
 #include "generated/airframe.h"
 #include "generated/flight_plan.h"
+#if INS_UPDATE_FW_ESTIMATOR
 #include "firmwares/fixedwing/nav.h"
+#endif
 
 #include "math/pprz_algebra_float.h"
 #include "math/pprz_algebra_int.h"
@@ -156,19 +158,6 @@ bool_t log_started = FALSE;
 #endif
 
 
-// FIXME this is still needed for fixedwing integration
-#if INS_UPDATE_FW_ESTIMATOR
-// remotely settable
-#ifndef INS_ROLL_NEUTRAL_DEFAULT
-#define INS_ROLL_NEUTRAL_DEFAULT 0.
-#endif
-#ifndef INS_PITCH_NEUTRAL_DEFAULT
-#define INS_PITCH_NEUTRAL_DEFAULT 0.
-#endif
-float ins_roll_neutral = INS_ROLL_NEUTRAL_DEFAULT;
-float ins_pitch_neutral = INS_PITCH_NEUTRAL_DEFAULT;
-#endif
-
 struct InsFloatInv ins_impl;
 
 /* integration time step */
@@ -236,8 +225,8 @@ void ins_init() {
   stateSetPositionUtm_f(&utm0);
 #else
   struct LlaCoor_i llh_nav0; /* Height above the ellipsoid */
-  llh_nav0.lat = INT32_RAD_OF_DEG(NAV_LAT0);
-  llh_nav0.lon = INT32_RAD_OF_DEG(NAV_LON0);
+  llh_nav0.lat = NAV_LAT0;
+  llh_nav0.lon = NAV_LON0;
   /* NAV_ALT0 = ground alt above msl, NAV_MSL0 = geoid-height (msl) over ellipsoid */
   llh_nav0.alt = NAV_ALT0 + NAV_MSL0;
   struct EcefCoor_i ecef_nav0;
@@ -284,9 +273,8 @@ void ins_reset_local_origin( void ) {
 #ifdef GPS_USE_LATLONG
   /* Recompute UTM coordinates in this zone */
   struct LlaCoor_f lla;
-  lla.lat = gps.lla_pos.lat / 1e7;
-  lla.lon = gps.lla_pos.lon / 1e7;
-  utm.zone = (DegOfRad(gps.lla_pos.lon/1e7)+180) / 6 + 1;
+  LLA_FLOAT_OF_BFP(lla, gps.lla_pos);
+  utm.zone = (gps.lla_pos.lon/1e7 + 180) / 6 + 1;
   utm_of_lla_f(&utm, &lla);
 #else
   utm.zone = gps.utm_pos.zone;
@@ -357,10 +345,11 @@ void ahrs_propagate(void) {
 
   // fill command vector
   struct Int32Rates gyro_meas_body;
-  INT32_RMAT_TRANSP_RATEMULT(gyro_meas_body, imu.body_to_imu_rmat, imu.gyro);
+  struct Int32RMat *body_to_imu_rmat = orientationGetRMat_i(&imu.body_to_imu);
+  INT32_RMAT_TRANSP_RATEMULT(gyro_meas_body, *body_to_imu_rmat, imu.gyro);
   RATES_FLOAT_OF_BFP(ins_impl.cmd.rates, gyro_meas_body);
   struct Int32Vect3 accel_meas_body;
-  INT32_RMAT_TRANSP_VMULT(accel_meas_body, imu.body_to_imu_rmat, imu.accel);
+  INT32_RMAT_TRANSP_VMULT(accel_meas_body, *body_to_imu_rmat, imu.accel);
   ACCELS_FLOAT_OF_BFP(ins_impl.cmd.accel, accel_meas_body);
 
   // update correction gains
@@ -378,18 +367,7 @@ void ahrs_propagate(void) {
   FLOAT_QUAT_NORMALIZE(ins_impl.state.quat);
 
   // set global state
-#if INS_UPDATE_FW_ESTIMATOR || SEND_INVARIANT_FILTER
-  struct FloatEulers eulers;
-  FLOAT_EULERS_OF_QUAT(eulers, ins_impl.state.quat);
-#endif
-#if INS_UPDATE_FW_ESTIMATOR
-  // Some stupid lines of code for neutrals
-  eulers.phi -= ins_roll_neutral;
-  eulers.theta -= ins_pitch_neutral;
-  stateSetNedToBodyEulers_f(&eulers);
-#else
   stateSetNedToBodyQuat_f(&ins_impl.state.quat);
-#endif
   RATES_DIFF(body_rates, ins_impl.cmd.rates, ins_impl.state.bias);
   stateSetBodyRates_f(&body_rates);
   stateSetPositionNed_f(&ins_impl.state.pos);
@@ -403,6 +381,8 @@ void ahrs_propagate(void) {
   //------------------------------------------------------------//
 
 #if SEND_INVARIANT_FILTER
+  struct FloatEulers eulers;
+  FLOAT_EULERS_OF_QUAT(eulers, ins_impl.state.quat);
   RunOnceEvery(3,{
       DOWNLINK_SEND_INV_FILTER(DefaultChannel, DefaultDevice,
         &ins_impl.state.quat.qi,
@@ -536,8 +516,32 @@ static void baro_cb(uint8_t __attribute__((unused)) sender_id, const float *pres
 void ahrs_update_accel(void) {
 }
 
+// assume mag is dead when values are not moving anymore
+#define MAG_FROZEN_COUNT 30
+
 void ahrs_update_mag(void) {
-  MAGS_FLOAT_OF_BFP(ins_impl.meas.mag, imu.mag);
+  static uint32_t mag_frozen_count = MAG_FROZEN_COUNT;
+  static int32_t last_mx = 0;
+
+  if (last_mx == imu.mag.x) {
+    mag_frozen_count--;
+    if (mag_frozen_count == 0) {
+      // if mag is dead, better set measurements to zero
+      FLOAT_VECT3_ZERO(ins_impl.meas.mag);
+      mag_frozen_count = MAG_FROZEN_COUNT;
+    }
+  }
+  else {
+    // values are moving
+    struct Int32RMat *body_to_imu_rmat = orientationGetRMat_i(&imu.body_to_imu);
+    struct Int32Vect3 mag_meas_body;
+    // new values in body frame
+    INT32_RMAT_TRANSP_VMULT(mag_meas_body, *body_to_imu_rmat, imu.mag);
+    MAGS_FLOAT_OF_BFP(ins_impl.meas.mag, mag_meas_body);
+    // reset counter
+    mag_frozen_count = MAG_FROZEN_COUNT;
+  }
+  last_mx = imu.mag.x;
 }
 
 

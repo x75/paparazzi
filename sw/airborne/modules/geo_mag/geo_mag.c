@@ -42,7 +42,7 @@ void geo_mag_init(void) {
 }
 
 void geo_mag_periodic(void) {
-  if (gps.fix == GPS_FIX_3D && !geo_mag_vect.ready && !autopilot_motors_on)
+  if (!geo_mag_vect.ready && gps.fix == GPS_FIX_3D && kill_throttle)
     geo_mag_calc_flag = TRUE;
 }
 
@@ -58,8 +58,8 @@ void geo_mag_event(void) {
       (double)gps.tow/1000/SECS_IN_YEAR;
 
     /* LLA Position in decimal degrees and altitude in km */
-    double latitude = DegOfRad((double)gps.lla_pos.lat / 1e7);
-    double longitude = DegOfRad((double)gps.lla_pos.lon / 1e7);
+    double latitude = (double)gps.lla_pos.lat / 1e7;
+    double longitude = (double)gps.lla_pos.lon / 1e7;
     double alt = (double)gps.lla_pos.alt / 1e6;
 
     // Calculates additional coeffs

@@ -67,23 +67,23 @@ struct AhrsIntCmplQuat {
 
   /** filter cut-off frequency for correcting the attitude from accels.
    *  (pseudo-gravity measurement)
-   * only update through #ahrs_int_cmpl_quat_SetAccelOmega(omega)
+   * only update through #ahrs_int_cmpl_quat_SetAccelOmega
    */
   float accel_omega;
 
   /** filter damping for correcting the gyro-bias from accels.
    *  (pseudo-gravity measurement)
-   * only update through #ahrs_int_cmpl_quat_SetAccelZeta(zeta)
+   * only update through #ahrs_int_cmpl_quat_SetAccelZeta
    */
   float accel_zeta;
 
   /** filter cut-off frequency for correcting the attitude (heading) from magnetometer.
-   * only update through #ahrs_int_cmpl_quat_SetMagOmega(omega)
+   * only update through #ahrs_int_cmpl_quat_SetMagOmega
    */
   float mag_omega;
 
   /** filter damping for correcting the gyro bias from magnetometer.
-   * only update through #ahrs_int_cmpl_quat_SetMagZeta(zeta)
+   * only update through #ahrs_int_cmpl_quat_SetMagZeta
    */
   float mag_zeta;
 };
@@ -131,10 +131,5 @@ static inline void ahrs_int_cmpl_quat_SetMagZeta(float zeta) {
   ahrs_set_mag_gains();
 }
 
-
-#ifdef AHRS_UPDATE_FW_ESTIMATOR
-extern float ins_roll_neutral;
-extern float ins_pitch_neutral;
-#endif
 
 #endif /* AHRS_INT_CMPL_QUAT_H */

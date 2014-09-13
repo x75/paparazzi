@@ -30,6 +30,10 @@
 #ifndef PPRZ_GEODETIC_DOUBLE_H
 #define PPRZ_GEODETIC_DOUBLE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "pprz_geodetic.h"
 #include "pprz_algebra_double.h"
 #include "std.h"
@@ -112,7 +116,13 @@ extern void ecef_of_ned_point_d(struct EcefCoor_d* ecef, struct LtpDef_d* def, s
 extern void ecef_of_enu_vect_d(struct EcefCoor_d* ecef, struct LtpDef_d* def, struct EnuCoor_d* enu);
 extern void ecef_of_ned_vect_d(struct EcefCoor_d* ecef, struct LtpDef_d* def, struct NedCoor_d* ned);
 
+extern void enu_of_lla_point_d(struct EnuCoor_d* enu, struct LtpDef_d* def, struct LlaCoor_d* lla);
+extern void ned_of_lla_point_d(struct NedCoor_d* ned, struct LtpDef_d* def, struct LlaCoor_d* lla);
+
 extern double gc_of_gd_lat_d(double gd_lat, double hmsl);
 
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* PPRZ_GEODETIC_DOUBLE_H */

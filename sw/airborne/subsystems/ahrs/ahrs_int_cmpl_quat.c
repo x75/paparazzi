@@ -56,7 +56,7 @@ PRINT_CONFIG_MSG("LOW PASS FILTER ON GYRO RATES")
 #endif
 
 #if !USE_MAGNETOMETER && !AHRS_USE_GPS_HEADING
-#error "Please use either USE_MAGNETOMETER or AHRS_USE_GPS_HEADING."
+#warning "Please use either USE_MAGNETOMETER or AHRS_USE_GPS_HEADING."
 #endif
 
 #if AHRS_USE_GPS_HEADING && !USE_GPS
@@ -127,22 +127,10 @@ PRINT_CONFIG_VAR(AHRS_MAG_ZETA)
 #define AHRS_HEADING_UPDATE_GPS_MIN_SPEED 5.0
 #endif
 
-#ifdef AHRS_UPDATE_FW_ESTIMATOR
-// remotely settable
-#ifndef INS_ROLL_NEUTRAL_DEFAULT
-#define INS_ROLL_NEUTRAL_DEFAULT 0
-#endif
-#ifndef INS_PITCH_NEUTRAL_DEFAULT
-#define INS_PITCH_NEUTRAL_DEFAULT 0
-#endif
-float ins_roll_neutral = INS_ROLL_NEUTRAL_DEFAULT;
-float ins_pitch_neutral = INS_PITCH_NEUTRAL_DEFAULT;
-#endif
-
 struct AhrsIntCmplQuat ahrs_impl;
 
 static inline void set_body_state_from_quat(void);
-static inline void ahrs_update_mag_full(void);
+static inline void UNUSED ahrs_update_mag_full(void);
 static inline void ahrs_update_mag_2d(void);
 
 #if PERIODIC_TELEMETRY
@@ -197,7 +185,8 @@ void ahrs_init(void) {
   ahrs_impl.heading_aligned = FALSE;
 
   /* set ltp_to_imu so that body is zero */
-  QUAT_COPY(ahrs_impl.ltp_to_imu_quat, imu.body_to_imu_quat);
+  memcpy(&ahrs_impl.ltp_to_imu_quat, orientationGetQuat_i(&imu.body_to_imu),
+         sizeof(struct Int32Quat));
   INT_RATES_ZERO(ahrs_impl.imu_rate);
 
   INT_RATES_ZERO(ahrs_impl.gyro_bias);
@@ -343,7 +332,8 @@ void ahrs_update_accel(void) {
 
     /* convert centrifucal acceleration from body to imu frame */
     struct Int32Vect3 acc_c_imu;
-    INT32_RMAT_VMULT(acc_c_imu, imu.body_to_imu_rmat, acc_c_body);
+    struct Int32RMat *body_to_imu_rmat = orientationGetRMat_i(&imu.body_to_imu);
+    INT32_RMAT_VMULT(acc_c_imu, *body_to_imu_rmat, acc_c_body);
 
     /* and subtract it from imu measurement to get a corrected measurement
      * of the gravity vector */
@@ -679,7 +669,8 @@ void ahrs_realign_heading(int32_t heading) {
   QUAT_COPY(ltp_to_body_quat, q);
 
   /* compute ltp to imu rotations */
-  INT32_QUAT_COMP(ahrs_impl.ltp_to_imu_quat, ltp_to_body_quat, imu.body_to_imu_quat);
+  struct Int32Quat *body_to_imu_quat = orientationGetQuat_i(&imu.body_to_imu);
+  INT32_QUAT_COMP(ahrs_impl.ltp_to_imu_quat, ltp_to_body_quat, *body_to_imu_quat);
 
   /* Set state */
   stateSetNedToBodyQuat_i(&ltp_to_body_quat);
@@ -692,25 +683,15 @@ void ahrs_realign_heading(int32_t heading) {
 static inline void set_body_state_from_quat(void) {
   /* Compute LTP to BODY quaternion */
   struct Int32Quat ltp_to_body_quat;
-  INT32_QUAT_COMP_INV(ltp_to_body_quat, ahrs_impl.ltp_to_imu_quat, imu.body_to_imu_quat);
+  struct Int32Quat *body_to_imu_quat = orientationGetQuat_i(&imu.body_to_imu);
+  INT32_QUAT_COMP_INV(ltp_to_body_quat, ahrs_impl.ltp_to_imu_quat, *body_to_imu_quat);
   /* Set state */
-#ifdef AHRS_UPDATE_FW_ESTIMATOR
-  struct Int32Eulers neutrals_to_body_eulers = {
-    ANGLE_BFP_OF_REAL(ins_roll_neutral),
-    ANGLE_BFP_OF_REAL(ins_pitch_neutral),
-    0 };
-  struct Int32Quat neutrals_to_body_quat, ltp_to_neutrals_quat;
-  INT32_QUAT_OF_EULERS(neutrals_to_body_quat, neutrals_to_body_eulers);
-  INT32_QUAT_NORMALIZE(neutrals_to_body_quat);
-  INT32_QUAT_COMP_INV(ltp_to_neutrals_quat, ltp_to_body_quat, neutrals_to_body_quat);
-  stateSetNedToBodyQuat_i(&ltp_to_neutrals_quat);
-#else
   stateSetNedToBodyQuat_i(&ltp_to_body_quat);
-#endif
 
   /* compute body rates */
   struct Int32Rates body_rate;
-  INT32_RMAT_TRANSP_RATEMULT(body_rate, imu.body_to_imu_rmat, ahrs_impl.imu_rate);
+  struct Int32RMat *body_to_imu_rmat = orientationGetRMat_i(&imu.body_to_imu);
+  INT32_RMAT_TRANSP_RATEMULT(body_rate, *body_to_imu_rmat, ahrs_impl.imu_rate);
   /* Set state */
   stateSetBodyRates_i(&body_rate);
 }

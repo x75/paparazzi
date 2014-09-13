@@ -94,18 +94,6 @@ PRINT_CONFIG_VAR(AHRS_MAG_CORRECT_FREQUENCY)
 #define AHRS_GRAVITY_HEURISTIC_FACTOR 30
 #endif
 
-#ifdef AHRS_UPDATE_FW_ESTIMATOR
-// remotely settable
-#ifndef INS_ROLL_NEUTRAL_DEFAULT
-#define INS_ROLL_NEUTRAL_DEFAULT 0
-#endif
-#ifndef INS_PITCH_NEUTRAL_DEFAULT
-#define INS_PITCH_NEUTRAL_DEFAULT 0
-#endif
-float ins_roll_neutral = INS_ROLL_NEUTRAL_DEFAULT;
-float ins_pitch_neutral = INS_PITCH_NEUTRAL_DEFAULT;
-#endif //AHRS_UPDATE_FW_ESTIMATOR
-
 
 void ahrs_update_mag_full(void);
 void ahrs_update_mag_2d(void);
@@ -171,15 +159,11 @@ void ahrs_init(void) {
   ahrs_impl.ltp_vel_norm_valid = FALSE;
   ahrs_impl.heading_aligned = FALSE;
 
-  /* Initialises IMU alignement */
-  struct FloatEulers body_to_imu_euler =
-    {IMU_BODY_TO_IMU_PHI, IMU_BODY_TO_IMU_THETA, IMU_BODY_TO_IMU_PSI};
-  FLOAT_QUAT_OF_EULERS(ahrs_impl.body_to_imu_quat, body_to_imu_euler);
-  FLOAT_RMAT_OF_EULERS(ahrs_impl.body_to_imu_rmat, body_to_imu_euler);
-
   /* Set ltp_to_imu so that body is zero */
-  QUAT_COPY(ahrs_impl.ltp_to_imu_quat, ahrs_impl.body_to_imu_quat);
-  RMAT_COPY(ahrs_impl.ltp_to_imu_rmat, ahrs_impl.body_to_imu_rmat);
+  memcpy(&ahrs_impl.ltp_to_imu_quat, orientationGetQuat_f(&imu.body_to_imu),
+         sizeof(struct FloatQuat));
+  memcpy(&ahrs_impl.ltp_to_imu_rmat, orientationGetRMat_f(&imu.body_to_imu),
+         sizeof(struct FloatRMat));
 
   FLOAT_RATES_ZERO(ahrs_impl.imu_rate);
 
@@ -295,7 +279,8 @@ void ahrs_update_accel(void) {
 
     /* convert centrifugal acceleration from body to imu frame */
     struct FloatVect3 acc_c_imu;
-    FLOAT_RMAT_VECT3_MUL(acc_c_imu, ahrs_impl.body_to_imu_rmat, acc_c_body);
+    struct FloatRMat *body_to_imu_rmat = orientationGetRMat_f(&imu.body_to_imu);
+    FLOAT_RMAT_VECT3_MUL(acc_c_imu, *body_to_imu_rmat, acc_c_body);
 
     /* and subtract it from imu measurement to get a corrected measurement of the gravity vector */
     VECT3_DIFF(pseudo_gravity_measurement, imu_accel_float, acc_c_imu);
@@ -556,7 +541,8 @@ void ahrs_realign_heading(float heading) {
   FLOAT_QUAT_COMP_NORM_SHORTEST(q, q_c, *ltp_to_body_quat);
 
   /* compute ltp to imu rotation quaternion and matrix */
-  FLOAT_QUAT_COMP(ahrs_impl.ltp_to_imu_quat, q, ahrs_impl.body_to_imu_quat);
+  struct FloatQuat *body_to_imu_quat = orientationGetQuat_f(&imu.body_to_imu);
+  FLOAT_QUAT_COMP(ahrs_impl.ltp_to_imu_quat, q, *body_to_imu_quat);
   FLOAT_RMAT_OF_QUAT(ahrs_impl.ltp_to_imu_rmat, ahrs_impl.ltp_to_imu_quat);
 
   /* set state */
@@ -572,21 +558,14 @@ void ahrs_realign_heading(float heading) {
 static inline void compute_body_orientation_and_rates(void) {
   /* Compute LTP to BODY quaternion */
   struct FloatQuat ltp_to_body_quat;
-  FLOAT_QUAT_COMP_INV(ltp_to_body_quat, ahrs_impl.ltp_to_imu_quat, ahrs_impl.body_to_imu_quat);
+  struct FloatQuat *body_to_imu_quat = orientationGetQuat_f(&imu.body_to_imu);
+  FLOAT_QUAT_COMP_INV(ltp_to_body_quat, ahrs_impl.ltp_to_imu_quat, *body_to_imu_quat);
   /* Set state */
-#ifdef AHRS_UPDATE_FW_ESTIMATOR
-  struct FloatEulers neutrals_to_body_eulers = { ins_roll_neutral, ins_pitch_neutral, 0. };
-  struct FloatQuat neutrals_to_body_quat, ltp_to_neutrals_quat;
-  FLOAT_QUAT_OF_EULERS(neutrals_to_body_quat, neutrals_to_body_eulers);
-  FLOAT_QUAT_NORMALIZE(neutrals_to_body_quat);
-  FLOAT_QUAT_COMP_INV(ltp_to_neutrals_quat, ltp_to_body_quat, neutrals_to_body_quat);
-  stateSetNedToBodyQuat_f(&ltp_to_neutrals_quat);
-#else
   stateSetNedToBodyQuat_f(&ltp_to_body_quat);
-#endif
 
   /* compute body rates */
   struct FloatRates body_rate;
-  FLOAT_RMAT_TRANSP_RATEMULT(body_rate, ahrs_impl.body_to_imu_rmat, ahrs_impl.imu_rate);
+  struct FloatRMat *body_to_imu_rmat = orientationGetRMat_f(&imu.body_to_imu);
+  FLOAT_RMAT_TRANSP_RATEMULT(body_rate, *body_to_imu_rmat, ahrs_impl.imu_rate);
   stateSetBodyRates_f(&body_rate);
 }

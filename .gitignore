@@ -31,6 +31,8 @@
 /build.properties
 /META-INF
 
+paparazzi.sublime-workspace
+
 # JetBrains (PyCharm, etc) IDE project files
 .idea
 
@@ -145,7 +147,7 @@
 /sw/ground_segment/misc/davis2ivy
 /sw/ground_segment/misc/kestrel2ivy
 /sw/ground_segment/misc/natnet2ivy
-
+/sw/ground_segment/misc/video_synchronizer
 
 # /sw/airborne/arch/lpc21/test/bootloader
 /sw/airborne/arch/lpc21/test/bootloader/bl.dmp
@@ -169,12 +171,7 @@
 # Mac OS X
 .DS_Store
 
-sw/ground_segment/lpc21iap/lpc21iap.dSYM/Contents/Info.plist
-
-sw/ground_segment/lpc21iap/lpc21iap.dSYM/Contents/Resources/DWARF/lpc21iap
-
 tests/results/*
 
-sw/logalizer/plotprofile.dSYM/Contents/Resources/DWARF/plotprofile
+*.dSYM
 
-sw/logalizer/plotprofile.dSYM/Contents/Info.plist
