@@ -10,7 +10,7 @@ import sys
 sys.path.append(os.getenv("PAPARAZZI_HOME") + "/sw/lib/python")
 from settings_xml_parse import PaparazziACSettings
 
-_SHOW_IVY_MSGS_ = False
+_SHOW_IVY_MSGS_ = True
 
 class IvySettingsInterface(PaparazziACSettings):
     def __init__(self, ac_ids):
@@ -79,7 +79,7 @@ class IvySettingsInterface(PaparazziACSettings):
 
 
 def main():
-    ac_id = [ 11 ]
+    ac_id = [ 167 ]
     ivy_interface = IvySettingsInterface(ac_id)
 
 if __name__ == '__main__':
