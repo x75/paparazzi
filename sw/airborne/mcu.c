@@ -39,16 +39,21 @@
 #endif
 #endif
 #if USE_UART0 || USE_UART1 || USE_UART2 || USE_UART3 || USE_UART4 || USE_UART5 || USE_UART6
+#define USING_UART 1
 #include "mcu_periph/uart.h"
 #endif
-#if USE_I2C0 || USE_I2C1 || USE_I2C2
+#if USE_I2C0 || USE_I2C1 || USE_I2C2 || USE_I2C3
+#define USING_I2C 1
 #include "mcu_periph/i2c.h"
 #endif
 #if USE_ADC
 #include "mcu_periph/adc.h"
 #endif
-#ifdef USE_USB_SERIAL
+#if USE_USB_SERIAL
 #include "mcu_periph/usb_serial.h"
+#endif
+#ifdef USE_UDP
+#include "mcu_periph/udp.h"
 #endif
 #if USE_SPI
 #include "mcu_periph/spi.h"
@@ -58,7 +63,8 @@
 #endif
 #endif /* PERIPHERALS_AUTO_INIT */
 
-void mcu_init(void) {
+void mcu_init(void)
+{
 
   mcu_arch_init();
 
@@ -107,7 +113,7 @@ void mcu_init(void) {
 #if USE_ADC
   adc_init();
 #endif
-#ifdef USE_USB_SERIAL
+#if USE_USB_SERIAL
   VCOM_init();
 #endif
 
@@ -152,8 +158,38 @@ void mcu_init(void) {
 #ifdef USE_DAC
   dac_init();
 #endif
+
+#ifdef USE_UDP0
+  UDP0Init();
+#endif
+#ifdef USE_UDP1
+  UDP1Init();
+#endif
+#ifdef USE_UDP2
+  UDP2Init();
+#endif
+
 #else
-INFO("PERIPHERALS_AUTO_INIT not enabled! Peripherals (including sys_time) need explicit initialization.")
+  INFO("PERIPHERALS_AUTO_INIT not enabled! Peripherals (including sys_time) need explicit initialization.")
 #endif /* PERIPHERALS_AUTO_INIT */
 
+}
+
+void mcu_event(void)
+{
+#if USING_I2C
+  i2c_event();
+#endif
+
+#if USING_UART
+  uart_event();
+#endif
+
+#if USE_UDP
+  udp_event();
+#endif
+
+#if USE_USB_SERIAL
+  VCOM_event();
+#endif
 }

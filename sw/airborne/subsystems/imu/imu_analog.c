@@ -21,15 +21,15 @@
 
 #include "imu_analog.h"
 #include "mcu_periph/adc.h"
+#include "subsystems/abi.h"
 
-volatile bool_t analog_imu_available;
 int imu_overrun;
 
 static struct adc_buf analog_imu_adc_buf[NB_ANALOG_IMU_ADC];
 
-void imu_impl_init(void) {
+void imu_impl_init(void)
+{
 
-  analog_imu_available = FALSE;
   imu_overrun = 0;
 
 #ifdef ADC_CHANNEL_GYRO_P
@@ -53,13 +53,17 @@ void imu_impl_init(void) {
 
 }
 
-void imu_periodic(void) {
+void imu_periodic(void)
+{
   // Actual Nr of ADC measurements per channel per periodic loop
   static int last_head = 0;
 
+  uint32_t now_ts = get_sys_time_usec();
+
   imu_overrun = analog_imu_adc_buf[0].head - last_head;
-  if (imu_overrun < 0)
+  if (imu_overrun < 0) {
     imu_overrun += ADC_CHANNEL_GYRO_NB_SAMPLES;
+  }
   last_head = analog_imu_adc_buf[0].head;
 
   // Read All Measurements
@@ -82,5 +86,34 @@ void imu_periodic(void) {
   imu.accel_unscaled.z = analog_imu_adc_buf[5].sum / ADC_CHANNEL_ACCEL_NB_SAMPLES;
 #endif
 
-  analog_imu_available = TRUE;
+  imu_scale_gyro(&imu);
+  imu_scale_accel(&imu);
+  AbiSendMsgIMU_GYRO_INT32(IMU_ANALOG_ID, now_ts, &imu.gyro);
+  AbiSendMsgIMU_ACCEL_INT32(IMU_ANALOG_ID, now_ts, &imu.accel);
 }
+
+// if not all gyros are used, override the imu_scale_gyro handler
+#if defined ADC_CHANNEL_GYRO_P && defined ADC_CHANNEL_GYRO_Q && ! defined ADC_CHANNEL_GYRO_R
+
+void imu_scale_gyro(struct Imu *_imu)
+{
+  _imu->gyro.p = ((_imu->gyro_unscaled.p - _imu->gyro_neutral.p) * IMU_GYRO_P_SIGN * IMU_GYRO_P_SENS_NUM) /
+                 IMU_GYRO_P_SENS_DEN;
+  _imu->gyro.q = ((_imu->gyro_unscaled.q - _imu->gyro_neutral.q) * IMU_GYRO_Q_SIGN * IMU_GYRO_Q_SENS_NUM) /
+                 IMU_GYRO_Q_SENS_DEN;
+}
+
+#elif defined ADC_CHANNEL_GYRO_P && ! defined ADC_CHANNEL_GYRO_Q && ! defined ADC_CHANNEL_GYRO_R
+
+void imu_scale_gyro(struct Imu *_imu)
+{
+  _imu->gyro.p = ((_imu->gyro_unscaled.p - _imu->gyro_neutral.p) * IMU_GYRO_P_SIGN * IMU_GYRO_P_SENS_NUM) /
+                 IMU_GYRO_P_SENS_DEN;
+}
+
+#endif
+
+// if we don't have any accelerometers, set an empty imu_scale_accel handler
+#if ! defined ADC_CHANNEL_ACCEL_X && ! defined ADC_CHANNEL_ACCEL_Z && ! defined ADC_CHANNEL_ACCEL_Z
+void imu_scale_accel(struct Imu *_imu __attribute__((unused))) {}
+#endif

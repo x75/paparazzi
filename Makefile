@@ -104,13 +104,25 @@ GEN_HEADERS = $(MESSAGES_H) $(UBX_PROTOCOL_H) $(MTK_PROTOCOL_H) $(XSENS_PROTOCOL
 
 all: ground_segment ext lpctools
 
-print_build_version:
+_print_building:
 	@echo "------------------------------------------------------------"
 	@echo "Building Paparazzi version" $(shell ./paparazzi_version)
 	@echo "------------------------------------------------------------"
 
+print_build_version:
+	@echo "------------------------------------------------------------"
+	@echo "Last build Paparazzi version" $(shell cat $(PAPARAZZI_HOME)/var/build_version.txt 2> /dev/null || echo UNKNOWN)
+	@echo "------------------------------------------------------------"
+
+_save_build_version:
+	$(Q)test -d $(PAPARAZZI_HOME)/var || mkdir -p $(PAPARAZZI_HOME)/var
+	$(Q)./paparazzi_version > $(PAPARAZZI_HOME)/var/build_version.txt
+
 update_google_version:
 	-$(MAKE) -C data/maps
+
+init:
+	@[ -d $(PAPARAZZI_HOME) ] || (echo "Copying config example in your $(PAPARAZZI_HOME) directory"; mkdir -p $(PAPARAZZI_HOME); cp -a conf $(PAPARAZZI_HOME); cp -a data $(PAPARAZZI_HOME); mkdir -p $(PAPARAZZI_HOME)/var/maps; mkdir -p $(PAPARAZZI_HOME)/var/include)
 
 conf: conf/conf.xml conf/control_panel.xml conf/maps.xml
 
@@ -118,12 +130,12 @@ conf/%.xml :conf/%_example.xml
 	[ -L $@ ] || [ -f $@ ] || cp $< $@
 
 
-ground_segment: print_build_version update_google_version conf libpprz subdirs commands static
+ground_segment: _print_building update_google_version conf libpprz subdirs commands static
 ground_segment.opt: ground_segment cockpit.opt tmtc.opt
 
 static: cockpit tmtc generators sim_static joystick static_h
 
-libpprz:
+libpprz: _save_build_version
 	$(MAKE) -C $(LIB)/ocaml
 
 multimon:
@@ -295,22 +307,24 @@ ab_clean:
 #
 # Tests
 #
+test: test_math test_examples
 
-replace_current_conf_xml:
-	test conf/conf.xml && mv conf/conf.xml conf/conf.xml.backup.$(BUILD_DATETIME)
-	cp conf/conf_tests.xml conf/conf.xml
+# compiles all aircrafts in conf_tests.xml
+test_examples: all
+	CONF_XML=conf/conf_tests.xml prove tests/examples/
 
-restore_conf_xml:
-	test conf/conf.xml.backup.$(BUILD_DATETIME) && mv conf/conf.xml.backup.$(BUILD_DATETIME) conf/conf.xml
+# run some math tests that don't need whole paparazzi to be built
+test_math:
+	make -C tests/math
 
-run_tests:
-	cd tests; $(MAKE) test
+# super simple simulator test, needs X
+# always uses conf/conf.xml, so that needs to contain the appropriate aircrafts
+# (only Microjet right now)
+test_sim: all
+	prove tests/sim
 
-test: all replace_current_conf_xml run_tests restore_conf_xml
-
-
-.PHONY: all print_build_version update_google_version dox ground_segment ground_segment.opt \
+.PHONY: all print_build_version _print_building _save_build_version update_google_version init dox ground_segment ground_segment.opt \
 subdirs $(SUBDIRS) conf ext libpprz multimon cockpit cockpit.opt tmtc tmtc.opt generators\
 static sim_static lpctools commands \
 clean cleanspaces ab_clean dist_clean distclean dist_clean_irreversible \
-test replace_current_conf_xml run_tests restore_conf_xml
+test test_examples test_math test_sim

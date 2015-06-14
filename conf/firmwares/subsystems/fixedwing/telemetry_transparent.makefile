@@ -1,11 +1,14 @@
 # Hey Emacs, this is a -*- makefile -*-
 
-telemetry_CFLAGS = -DUSE_$(MODEM_PORT)
-telemetry_CFLAGS += -D$(MODEM_PORT)_BAUD=$(MODEM_BAUD)
-telemetry_CFLAGS += -DDOWNLINK -DPERIODIC_TELEMETRY -DDOWNLINK_DEVICE=$(MODEM_PORT) -DPPRZ_UART=$(MODEM_PORT)
-telemetry_CFLAGS += -DDOWNLINK_TRANSPORT=PprzTransport -DDATALINK=PPRZ
-telemetry_srcs = subsystems/datalink/downlink.c subsystems/datalink/pprz_transport.c
+# include shared part for ap
+ifeq ($(TARGET),ap)
+include $(CFG_SHARED)/telemetry_transparent.makefile
+endif
 
-ap.CFLAGS += $(telemetry_CFLAGS)
-ap.srcs += $(telemetry_srcs) $(SRC_FIRMWARE)/datalink.c
+ap.srcs += $(SRC_FIRMWARE)/datalink.c $(SRC_FIRMWARE)/ap_downlink.c
+
+# avoid fbw_telemetry_mode error
+ap.srcs += $(SRC_FIRMWARE)/fbw_downlink.c
+
+fbw.srcs += $(SRC_FIRMWARE)/fbw_downlink.c
 

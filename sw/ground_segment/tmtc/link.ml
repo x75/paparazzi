@@ -54,7 +54,7 @@ type ground_device = {
 let my_id = 0
 
 (* Here we set the default id of the link*)
-let link_id = ref 0
+let link_id = ref (-1)
 let red_link = ref false
 
 (* enable broadcast messages by default *)
@@ -69,6 +69,15 @@ let gen_stat_trafic = ref false
 
 let add_timestamp = ref None
 
+let status_msg_period = ref 1000 (** ms *)
+let ping_msg_period = ref 5000 (** ms  *)
+
+(* Time (in ms) after which an aircraft is regarded as dead/off if no messages are received.
+   If an aircraft is not live anymore, no uplink messages are sent.
+   Set to a zero (or negative number) to disable this feature.
+*)
+let dead_aircraft_time_ms = ref 5000
+
 let send_message_over_ivy = fun sender name vs ->
   let timestamp =
     match !add_timestamp with
@@ -79,6 +88,13 @@ let send_message_over_ivy = fun sender name vs ->
   else
     Tm_Pprz.message_send ?timestamp sender name vs
 
+let send_ground_over_ivy = fun sender name vs ->
+  let timestamp =
+    match !add_timestamp with
+        None -> None
+      | Some start_time -> Some (Unix.gettimeofday () -. start_time) in
+  Ground_Pprz.message_send ?timestamp sender name vs
+
 
 (*********** Monitoring *************************************************)
 type status = {
@@ -87,6 +103,7 @@ type status = {
   mutable rx_byte : int;
   mutable rx_msg : int;
   mutable rx_err : int;
+  mutable tx_msg : int;
   mutable ms_since_last_msg : int;
   mutable last_ping : float; (* s *)
   mutable last_pong : float; (* s *)
@@ -94,12 +111,12 @@ type status = {
 }
 
 let statuss = Hashtbl.create 3
-let dead_aircraft_time_ms = 5000
 
 let initial_status = {
   last_rx_byte = 0; last_rx_msg = 0;
   rx_byte = 0; rx_msg = 0; rx_err = 0;
-  ms_since_last_msg = dead_aircraft_time_ms;
+  tx_msg = 0;
+  ms_since_last_msg = !dead_aircraft_time_ms;
   last_ping = 0.; last_pong = 0.;
   udp_peername = None
 }
@@ -119,14 +136,12 @@ let update_status = fun ?udp_peername ac_id buf_size is_pong ->
   if is_pong then
     status.last_pong <- Unix.gettimeofday ();;
 
-let status_msg_period = 1000 (** ms *)
-let ping_msg_period = 5000 (** ms  *)
 let status_ping_diff = 500 (* ms *)
 
 let live_aircraft = fun ac_id ->
   try
     let s = Hashtbl.find statuss ac_id in
-    s.ms_since_last_msg < dead_aircraft_time_ms
+    !dead_aircraft_time_ms <= 0 || s.ms_since_last_msg < !dead_aircraft_time_ms
   with
       Not_found -> false
 
@@ -146,25 +161,32 @@ let send_status_msg =
   let start = Unix.gettimeofday () in
   fun () ->
     Hashtbl.iter (fun ac_id status ->
-      let dt = float status_msg_period /. 1000. in
+      let dt = float !status_msg_period /. 1000. in
       let t = int_of_float (Unix.gettimeofday () -. start) in
       let byte_rate = float (status.rx_byte - status.last_rx_byte) /. dt
       and msg_rate = float (status.rx_msg - status.last_rx_msg) /. dt in
       status.last_rx_msg <- status.rx_msg;
       status.last_rx_byte <- status.rx_byte;
-      status.ms_since_last_msg <- status.ms_since_last_msg + status_msg_period;
-      let vs = ["link_id", Pprz.Int !link_id;
+      let vs = ["ac_id", Pprz.Int ac_id;
+                "link_id", Pprz.Int !link_id;
                 "run_time", Pprz.Int t;
-                "rx_bytes_rate", Pprz.Float byte_rate;
-                "rx_msgs_rate", Pprz.Float msg_rate;
-                "rx_err", Pprz.Int status.rx_err;
+                "rx_lost_time", Pprz.Int (status.ms_since_last_msg / 1000);
                 "rx_bytes", Pprz.Int status.rx_byte;
                 "rx_msgs", Pprz.Int status.rx_msg;
+                "rx_err", Pprz.Int status.rx_err;
+                "rx_bytes_rate", Pprz.Float byte_rate;
+                "rx_msgs_rate", Pprz.Float msg_rate;
+                "tx_msgs", Pprz.Int 0;
                 "ping_time", Pprz.Float (1000. *. (status.last_pong -. status.last_ping))
                ] in
-      send_message_over_ivy (string_of_int ac_id) "DOWNLINK_STATUS" vs)
+      send_ground_over_ivy "link" "LINK_REPORT" vs)
       statuss
 
+let update_ms_since_last_msg =
+  fun () ->
+    Hashtbl.iter (fun ac_id status ->
+      status.ms_since_last_msg <- status.ms_since_last_msg + !status_msg_period / 3)
+      statuss
 
 let use_tele_message = fun ?udp_peername ?raw_data_size payload ->
   let raw_data_size = match raw_data_size with None -> String.length (Serial.string_of_payload payload) | Some d -> d in
@@ -228,7 +250,7 @@ module XB = struct (** XBee module *)
       false))
 
   (* Array of sent packets for retry: (packet, nb of retries) *)
-  let packets = Array.create 256 ("", -1)
+  let packets = Array.make 256 ("", -1)
 
   (* Frame id generation > 0 and < 256 *)
   let gen_frame_id =
@@ -304,6 +326,11 @@ let udp_send = fun fd payload peername ->
 let send = fun ac_id device payload _priority ->
   Debug.call 's' (fun f -> fprintf f "%d\n" ac_id);
   if live_aircraft ac_id then
+    let _ = try
+      let s = Hashtbl.find statuss ac_id in
+      s.tx_msg <- s.tx_msg + 1;
+      ()
+    with Not_found -> () in
     match udp_peername ac_id with
         Some (Unix.ADDR_INET (peername, _port)) ->
           udp_send device.fd payload peername
@@ -319,6 +346,7 @@ let send = fun ac_id device payload _priority ->
 
 
 let broadcast = fun device payload _priority ->
+  Hashtbl.iter (fun _ s -> s.tx_msg <- s.tx_msg + 1) statuss;
   if !udp then
     Hashtbl.iter (* Sending to all alive A/C *)
       (fun ac_id status ->
@@ -456,13 +484,15 @@ let () =
       "-udp", Arg.Set udp, "Listen a UDP connection on <udp_port>";
       "-udp_port", Arg.Set_int udp_port, (sprintf "<UDP port> Default is %d" !udp_port);
       "-udp_uplink_port", Arg.Set_int udp_uplink_port, (sprintf "<UDP uplink port> Default is %d" !udp_uplink_port);
-      "-udp_port", Arg.Set_int udp_port, (sprintf "<UDP port> Default is %d" !udp_port);
       "-uplink", Arg.Set uplink, (sprintf "Deprecated (now default)");
       "-xbee_addr", Arg.Set_int XB.my_addr, (sprintf "<my_addr> (%d)" !XB.my_addr);
       "-xbee_retries", Arg.Set_int XB.my_addr, (sprintf "<nb retries> (%d)" !XB.nb_retries);
       "-xbee_868", Arg.Set Xbee.mode868, (sprintf "Enables the 868 protocol");
       "-redlink", Arg.Set red_link, (sprintf "Sets whether the link is a redundant link. Set this flag and the id flag to use multiple links");
-      "-id", Arg.Set_int link_id, (sprintf "Sets the link id. If multiple links are used, each must have a unique id. Default is %i" !link_id)
+      "-id", Arg.Set_int link_id, (sprintf "<id> Sets the link id. If multiple links are used, each must have a unique id. Default is %i" !link_id);
+      "-status_period", Arg.Set_int status_msg_period, (sprintf "<period> Sets the period (in ms) of the LINK_REPORT status message. Default is %i" !status_msg_period);
+      "-ping_period", Arg.Set_int ping_msg_period, (sprintf "<period> Sets the period (in ms) of the PING message sent to aircrafs. Default is %i" !ping_msg_period);
+      "-ac_timeout", Arg.Set_int dead_aircraft_time_ms, (sprintf "<time> Sets the time (in ms) after which an aircraft is regarded as dead/off if no messages are received. Default is %ims, set to zero to disable." !ping_msg_period)
     ] in
   Arg.parse options (fun _x -> ()) "Usage: ";
 
@@ -470,7 +500,7 @@ let () =
   Ivy.init "Link" "READY" (fun _ _ -> ());
   Ivy.start !ivy_bus;
 
-  if (!link_id <> 0) && (not !red_link) then
+  if (!link_id <> -1) && (not !red_link) then
     fprintf stderr "\nLINK WARNING: The link id was set to %i but the -redlink flag wasn't set. To use this link as a redundant link, set the -redlink flag.%!" !link_id;
 
   try
@@ -527,9 +557,10 @@ let () =
 
     (** Init and Periodic tasks *)
     begin
-      ignore (Glib.Timeout.add status_msg_period (fun () -> send_status_msg (); true));
+      ignore (Glib.Timeout.add !status_msg_period (fun () -> send_status_msg (); true));
+      ignore (Glib.Timeout.add (!status_msg_period / 3) (fun () -> update_ms_since_last_msg (); true));
       let start_ping = fun () ->
-        ignore (Glib.Timeout.add ping_msg_period (fun () -> send_ping_msg device; true));
+        ignore (Glib.Timeout.add !ping_msg_period (fun () -> send_ping_msg device; true));
         false in
       ignore (Glib.Timeout.add status_ping_diff start_ping);
       if !aerocomm then

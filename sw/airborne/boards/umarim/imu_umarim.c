@@ -33,6 +33,7 @@
 #include "imu_umarim.h"
 #include "mcu_periph/i2c.h"
 #include "generated/airframe.h"
+#include "subsystems/abi.h"
 
 // Downlink
 #include "mcu_periph/uart.h"
@@ -77,12 +78,9 @@ void imu_impl_init(void)
   // change the default data rate
   imu_umarim.adxl.config.rate = UMARIM_ACCEL_RATE;
   imu_umarim.adxl.config.range = UMARIM_ACCEL_RANGE;
-
-  imu_umarim.gyr_valid = FALSE;
-  imu_umarim.acc_valid = FALSE;
 }
 
-void imu_periodic( void )
+void imu_periodic(void)
 {
   // Start reading the latest gyroscope data
   itg3200_periodic(&imu_umarim.itg);
@@ -93,29 +91,36 @@ void imu_periodic( void )
   //RunOnceEvery(10,imu_umarim_downlink_raw());
 }
 
-void imu_umarim_downlink_raw( void )
+void imu_umarim_downlink_raw(void)
 {
-  DOWNLINK_SEND_IMU_GYRO_RAW(DefaultChannel, DefaultDevice,&imu.gyro_unscaled.p,&imu.gyro_unscaled.q,&imu.gyro_unscaled.r);
-  DOWNLINK_SEND_IMU_ACCEL_RAW(DefaultChannel, DefaultDevice,&imu.accel_unscaled.x,&imu.accel_unscaled.y,&imu.accel_unscaled.z);
+  DOWNLINK_SEND_IMU_GYRO_RAW(DefaultChannel, DefaultDevice, &imu.gyro_unscaled.p, &imu.gyro_unscaled.q,
+                             &imu.gyro_unscaled.r);
+  DOWNLINK_SEND_IMU_ACCEL_RAW(DefaultChannel, DefaultDevice, &imu.accel_unscaled.x, &imu.accel_unscaled.y,
+                              &imu.accel_unscaled.z);
 }
 
 
-void imu_umarim_event( void )
+void imu_umarim_event(void)
 {
+  uint32_t now_ts = get_sys_time_usec();
+
   // If the itg3200 I2C transaction has succeeded: convert the data
   itg3200_event(&imu_umarim.itg);
   if (imu_umarim.itg.data_available) {
     RATES_COPY(imu.gyro_unscaled, imu_umarim.itg.data.rates);
     imu_umarim.itg.data_available = FALSE;
-    imu_umarim.gyr_valid = TRUE;
+    imu_scale_gyro(&imu);
+    AbiSendMsgIMU_GYRO_INT32(IMU_BOARD_ID, now_ts, &imu.gyro);
   }
 
   // If the adxl345 I2C transaction has succeeded: convert the data
   adxl345_i2c_event(&imu_umarim.adxl);
   if (imu_umarim.adxl.data_available) {
-    VECT3_ASSIGN(imu.accel_unscaled, imu_umarim.adxl.data.vect.y, -imu_umarim.adxl.data.vect.x, imu_umarim.adxl.data.vect.z);
+    VECT3_ASSIGN(imu.accel_unscaled, imu_umarim.adxl.data.vect.y, -imu_umarim.adxl.data.vect.x,
+                 imu_umarim.adxl.data.vect.z);
     imu_umarim.adxl.data_available = FALSE;
-    imu_umarim.acc_valid = TRUE;
+    imu_scale_accel(&imu);
+    AbiSendMsgIMU_ACCEL_INT32(IMU_BOARD_ID, now_ts, &imu.accel);
   }
 }
 

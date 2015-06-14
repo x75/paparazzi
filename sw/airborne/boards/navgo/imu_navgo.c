@@ -34,6 +34,7 @@
 #include "imu_navgo.h"
 #include "mcu_periph/i2c.h"
 #include "led.h"
+#include "subsystems/abi.h"
 
 // Downlink
 #include "mcu_periph/uart.h"
@@ -87,13 +88,9 @@ void imu_impl_init(void)
   InitMedianFilterVect3Int(median_accel);
   InitMedianFilterVect3Int(median_mag);
 #endif
-
-  imu_navgo.gyr_valid = FALSE;
-  imu_navgo.acc_valid = FALSE;
-  imu_navgo.mag_valid = FALSE;
 }
 
-void imu_periodic( void )
+void imu_periodic(void)
 {
   // Start reading the latest gyroscope data
   itg3200_periodic(&imu_navgo.itg);
@@ -102,7 +99,7 @@ void imu_periodic( void )
   // Periodicity is automatically adapted
   // 3200 is the maximum output freq corresponding to the parameter 0xF
   // A factor 2 is applied to reduice the delay without overloading the i2c
-  RunOnceEvery((PERIODIC_FREQUENCY/(2*3200>>(0xf-NAVGO_ACCEL_RATE))), adxl345_i2c_periodic(&imu_navgo.adxl));
+  RunOnceEvery((PERIODIC_FREQUENCY / (2 * 3200 >> (0xf - NAVGO_ACCEL_RATE))), adxl345_i2c_periodic(&imu_navgo.adxl));
 
   // Read HMC58XX at 100Hz (main loop for rotorcraft: 512Hz)
   RunOnceEvery(5, hmc58xx_periodic(&imu_navgo.hmc));
@@ -111,15 +108,18 @@ void imu_periodic( void )
 }
 
 
-void imu_navgo_downlink_raw( void )
+void imu_navgo_downlink_raw(void)
 {
-  DOWNLINK_SEND_IMU_GYRO_RAW(DefaultChannel, DefaultDevice,&imu.gyro_unscaled.p,&imu.gyro_unscaled.q,&imu.gyro_unscaled.r);
-  DOWNLINK_SEND_IMU_ACCEL_RAW(DefaultChannel, DefaultDevice,&imu.accel_unscaled.x,&imu.accel_unscaled.y,&imu.accel_unscaled.z);
-  DOWNLINK_SEND_IMU_MAG_RAW(DefaultChannel, DefaultDevice,&imu.mag_unscaled.x,&imu.mag_unscaled.y,&imu.mag_unscaled.z);
+  DOWNLINK_SEND_IMU_GYRO_RAW(DefaultChannel, DefaultDevice, &imu.gyro_unscaled.p, &imu.gyro_unscaled.q,
+                             &imu.gyro_unscaled.r);
+  DOWNLINK_SEND_IMU_ACCEL_RAW(DefaultChannel, DefaultDevice, &imu.accel_unscaled.x, &imu.accel_unscaled.y,
+                              &imu.accel_unscaled.z);
+  DOWNLINK_SEND_IMU_MAG_RAW(DefaultChannel, DefaultDevice, &imu.mag_unscaled.x, &imu.mag_unscaled.y, &imu.mag_unscaled.z);
 }
 
-void imu_navgo_event( void )
+void imu_navgo_event(void)
 {
+  uint32_t now_ts = get_sys_time_usec();
 
   // If the itg3200 I2C transaction has succeeded: convert the data
   itg3200_event(&imu_navgo.itg);
@@ -129,7 +129,8 @@ void imu_navgo_event( void )
     UpdateMedianFilterRatesInt(median_gyro, imu.gyro_unscaled);
 #endif
     imu_navgo.itg.data_available = FALSE;
-    imu_navgo.gyr_valid = TRUE;
+    imu_scale_gyro(&imu);
+    AbiSendMsgIMU_GYRO_INT32(IMU_BOARD_ID, now_ts, &imu.gyro);
   }
 
   // If the adxl345 I2C transaction has succeeded: convert the data
@@ -140,7 +141,8 @@ void imu_navgo_event( void )
     UpdateMedianFilterVect3Int(median_accel, imu.accel_unscaled);
 #endif
     imu_navgo.adxl.data_available = FALSE;
-    imu_navgo.acc_valid = TRUE;
+    imu_scale_accel(&imu);
+    AbiSendMsgIMU_ACCEL_INT32(IMU_BOARD_ID, now_ts, &imu.accel);
   }
 
   // HMC58XX event task
@@ -151,8 +153,8 @@ void imu_navgo_event( void )
     UpdateMedianFilterVect3Int(median_mag, imu.mag_unscaled);
 #endif
     imu_navgo.hmc.data_available = FALSE;
-    imu_navgo.mag_valid = TRUE;
+    imu_scale_mag(&imu);
+    AbiSendMsgIMU_MAG_INT32(IMU_BOARD_ID, now_ts, &imu.mag);
   }
 
 }
-

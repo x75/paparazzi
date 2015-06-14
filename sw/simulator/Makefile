@@ -42,23 +42,10 @@ AIRBORNE = ../airborne
 VARINCLUDE=$(PAPARAZZI_HOME)/var/include
 ACINCLUDE = $(PAPARAZZI_HOME)/var/$(AIRCRAFT)
 
-UNAME = $(shell uname -s)
-ifeq ("$(UNAME)","Darwin")
-	CAML_CFLAGS = -I $(shell $(OCAMLC) -where)
-else
-	CAML_CFLAGS =
-endif
+CAML_CFLAGS = -I $(shell $(OCAMLC) -where)
 
 
-all : gaia sitl.cma simhitl
-
-fg.so : fg.o
-	@echo BUILD $@
-	$(Q)$(CC) -shared -o $@ $^
-
-simhitl : fg.so $(SIMHCMO) simhitl.cmo $(LIBPPRZCMA)
-	@echo OL $@
-	$(Q)$(OCAMLC) $(INCLUDES) -o $@ $(LINKPKG) gtkInit.cmo $<
+all : gaia sitl.cma
 
 sitl.cma : fg.o $(SIMSCMO) $(LIBPPRZCMA)
 	@echo OL $@

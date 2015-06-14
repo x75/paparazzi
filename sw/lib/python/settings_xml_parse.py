@@ -6,6 +6,10 @@ import os
 import sys
 from lxml import etree
 
+# if PAPARAZZI_HOME not set, then assume the tree containing this
+# file is a reasonable substitute
+PPRZ_HOME = os.getenv("PAPARAZZI_HOME", os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                                      '../../..')))
 # Class for all settings
 class PaparazziACSettings:
     "Paparazzi Settings Class"
@@ -18,7 +22,7 @@ class PaparazziACSettings:
 
     def __init__(self, ac_id):
         self.ac_id = ac_id
-        paparazzi_home = os.getenv("PAPARAZZI_HOME")
+        paparazzi_home = PPRZ_HOME
         paparazzi_conf = os.path.join(paparazzi_home, 'conf')
         conf_xml_path = os.path.join(paparazzi_conf, 'conf.xml')
         conf_tree = etree.parse(conf_xml_path)
@@ -31,8 +35,8 @@ class PaparazziACSettings:
         # save AC name for reference
         self.name = ac_node[0].attrib['name']
 
-        # get settings.xml file path from var/<ac_name> directory
-        settings_xml_path = os.path.join(paparazzi_home, 'var/' + self.name + '/settings.xml')
+        # get settings.xml file path from var/aircrafts/<ac_name> directory
+        settings_xml_path = os.path.join(paparazzi_home, 'var/aircrafts/' + self.name + '/settings.xml')
 
         if not os.path.isfile(settings_xml_path):
             print("Could not find %s, did you build it?" % settings_xml_path)

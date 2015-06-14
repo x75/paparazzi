@@ -1,6 +1,7 @@
 /*
  * Driver for a Amsys Differential Presure Sensor I2C
  * AMS 5812-0003-D
+ * AMS 5812-0001-D
  *
  * Copyright (C) 2010 The Paparazzi Team
  *
@@ -33,9 +34,9 @@ extern float airspeed_filter;
 
 extern struct i2c_transaction airspeed_amsys_i2c_trans;
 
-extern void airspeed_amsys_init( void );
-extern void airspeed_amsys_read_periodic( void );
-extern void airspeed_amsys_read_event( void );
+extern void airspeed_amsys_init(void);
+extern void airspeed_amsys_read_periodic(void);
+extern void airspeed_amsys_read_event(void);
 
 #define AirspeedAmsysEvent() { if (airspeed_amsys_i2c_trans.status == I2CTransSuccess) airspeed_amsys_read_event(); }
 

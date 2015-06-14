@@ -21,7 +21,7 @@
 
 #include "subsystems/gps/gps_sim_nps.h"
 #include "subsystems/gps.h"
-
+#include "subsystems/abi.h"
 #include "nps_sensors.h"
 #include "nps_fdm.h"
 
@@ -31,10 +31,10 @@
 #include "math/pprz_geodetic_float.h"
 #endif
 
-bool_t gps_available;
 bool_t gps_has_fix;
 
-void  gps_feed_value() {
+void  gps_feed_value()
+{
   // FIXME, set proper time instead of hardcoded to May 2014
   gps.week = 1794;
   gps.tow = fdm.time * 1000;
@@ -76,20 +76,30 @@ void  gps_feed_value() {
   /* convert to utm */
   utm_of_lla_f(&utm_f, &lla_f);
   /* copy results of utm conversion */
-  gps.utm_pos.east = utm_f.east*100;
-  gps.utm_pos.north = utm_f.north*100;
+  gps.utm_pos.east = utm_f.east * 100;
+  gps.utm_pos.north = utm_f.north * 100;
   gps.utm_pos.alt = gps.lla_pos.alt;
   gps.utm_pos.zone = nav_utm_zone0;
 #endif
 
-  if (gps_has_fix)
+  if (gps_has_fix) {
     gps.fix = GPS_FIX_3D;
-  else
+  } else {
     gps.fix = GPS_FIX_NONE;
-  gps_available = TRUE;
+  }
+
+  // publish gps data
+  uint32_t now_ts = get_sys_time_usec();
+  gps.last_msg_ticks = sys_time.nb_sec_rem;
+  gps.last_msg_time = sys_time.nb_sec;
+  if (gps.fix == GPS_FIX_3D) {
+    gps.last_3dfix_ticks = sys_time.nb_sec_rem;
+    gps.last_3dfix_time = sys_time.nb_sec;
+  }
+  AbiSendMsgGPS(GPS_SIM_ID, now_ts, &gps);
 }
 
-void gps_impl_init() {
-  gps_available = FALSE;
+void gps_impl_init()
+{
   gps_has_fix = TRUE;
 }

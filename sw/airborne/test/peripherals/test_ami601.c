@@ -25,8 +25,6 @@
 #include "mcu.h"
 #include "mcu_periph/sys_time.h"
 #include "led.h"
-#include "mcu_periph/uart.h"
-#include "messages.h"
 #include "subsystems/datalink/downlink.h"
 
 #include "mcu_periph/i2c.h"
@@ -35,48 +33,53 @@
 
 #include "std.h"
 
-static inline void main_init( void );
-static inline void main_periodic_task( void );
-static inline void main_event_task( void );
+static inline void main_init(void);
+static inline void main_periodic_task(void);
+static inline void main_event_task(void);
 
 static inline void on_mag(void);
 
-int main( void ) {
+int main(void)
+{
   main_init();
-  while(1) {
-    if (sys_time_check_and_ack_timer(0))
+  while (1) {
+    if (sys_time_check_and_ack_timer(0)) {
       main_periodic_task();
+    }
     main_event_task();
   }
   return 0;
 }
 
-static inline void main_init( void ) {
+static inline void main_init(void)
+{
   mcu_init();
-  sys_time_register_timer((1./PERIODIC_FREQUENCY), NULL);
+  sys_time_register_timer((1. / PERIODIC_FREQUENCY), NULL);
 
   LED_ON(4);
   ami601_init();
-
+  downlink_init();
   mcu_int_enable();
 }
 
-static inline void main_periodic_task( void ) {
+static inline void main_periodic_task(void)
+{
   //  RunOnceEvery(100, {DOWNLINK_SEND_ALIVE(DefaultChannel, DefaultDevice, 16, MD5SUM);});
 
   RunOnceEvery(10, { ami601_read();});
 }
 
-static inline void main_event_task( void ) {
+static inline void main_event_task(void)
+{
+  mcu_event();
 
   AMI601Event(on_mag);
-
 }
 
-static inline void on_mag(void) {
+static inline void on_mag(void)
+{
   LED_TOGGLE(4);
   ami601_status = AMI601_IDLE;
   struct Int32Vect3 bla = {ami601_values[0], ami601_values[1], ami601_values[2]};
   DOWNLINK_SEND_IMU_MAG_RAW(DefaultChannel, DefaultDevice, &bla.x, &bla.y, &bla.z);
-
 }

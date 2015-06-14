@@ -57,6 +57,7 @@
 #define GUIDANCE_H_MODE_RC_DIRECT   5
 #define GUIDANCE_H_MODE_CARE_FREE   6
 #define GUIDANCE_H_MODE_FORWARD     7
+#define GUIDANCE_H_MODE_MODULE      8
 
 
 extern uint8_t guidance_h_mode;
@@ -103,7 +104,7 @@ extern void guidance_h_run(bool_t in_flight);
 
 #define guidance_h_SetKi(_val) {            \
     guidance_h_igain = _val;                \
-    INT_VECT2_ZERO(guidance_h_trim_att_integrator);	\
+    INT_VECT2_ZERO(guidance_h_trim_att_integrator); \
   }
 
 /* Make sure that ref can only be temporarily disabled for testing,
@@ -113,19 +114,23 @@ extern void guidance_h_run(bool_t in_flight);
     guidance_h_use_ref = _val && GUIDANCE_H_USE_REF;    \
   }
 
-static inline void guidance_h_SetMaxSpeed(float speed) {
+static inline void guidance_h_SetMaxSpeed(float speed)
+{
   gh_set_max_speed(speed);
 }
 
-static inline void guidance_h_SetOmega(float omega) {
+static inline void guidance_h_SetOmega(float omega)
+{
   gh_set_omega(omega);
 }
 
-static inline void guidance_h_SetZeta(float zeta) {
+static inline void guidance_h_SetZeta(float zeta)
+{
   gh_set_zeta(zeta);
 }
 
-static inline void guidance_h_SetTau(float tau) {
+static inline void guidance_h_SetTau(float tau)
+{
   gh_set_tau(tau);
 }
 

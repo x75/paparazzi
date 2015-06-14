@@ -11,28 +11,28 @@
     <!-- <load name="mcp355x.xml"> -->
     <!--   <define name="USE_SPI1"/> -->
     <!-- </load> -->
-    <load name="extra_dl.xml">
+    <!--load name="extra_dl.xml">
       <configure name="EXTRA_DL_PORT" value="UART6"/>
       <configure name="EXTRA_DL_BAUD" value="B57600"/>
     </load>
-    <load name="meteo_france_DAQ.xml"/>
+    <load name="meteo_france_DAQ.xml"/-->
+    <load name="flight_recorder.xml"/>
   </modules>
 
   <firmware name="fixedwing">
+    <target name="ap" board="apogee_1.0_chibios">
+      <subsystem name="radio_control" type="sbus"/>
+      <configure name="PERIODIC_FREQUENCY" value="100"/>
+    </target>
+    <target name="sim" board="pc">
+      <subsystem name="radio_control" type="ppm"/>
+    </target>
+
     <define name="USE_I2C1"/>
     <!--define name="USE_I2C2"/-->
     <!--define name="AGR_CLIMB"/-->
     <!--define name="LOITER_TRIM"/-->
     <!--define name="PITCH_TRIM"/-->
-    <configure name="PERIODIC_FREQUENCY" value="100"/>
-
-    <target name="sim" board="pc">
-      <subsystem name="radio_control" type="ppm"/>
-    </target>
-    <target name="ap" board="apogee_1.0_chibios">
-      <subsystem name="radio_control" type="sbus"/>
-    </target>
-
 
     <!-- Communication -->
     <subsystem name="telemetry" type="xbee_api"/>

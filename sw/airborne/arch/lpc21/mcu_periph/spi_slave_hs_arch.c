@@ -30,7 +30,6 @@
 #include "mcu_periph/spi.h"
 
 #include BOARD_CONFIG
-#include "interrupt_hw.h"
 #include "std.h"
 #include "mcu.h"
 #include "led.h"
@@ -39,6 +38,7 @@
 #include "pprz_debug.h"
 #include "armVIC.h"
 
+struct spi_slave_hs spi_slave_hs;
 
 /* High Speed SPI Slave Circular Buffer */
 uint16_t spi_slave_hs_rx_insert_idx, spi_slave_hs_rx_extract_idx;
@@ -94,9 +94,9 @@ static void SSP_ISR(void) __attribute__((naked));
 #define SSP_PINSEL1_SSEL (2<<8)
 
 
-#define SSP_Write(X) 	SSPDR=(X)
-#define SSP_Read() 	SSPDR
-#define SSP_Status() 	SSPSR
+#define SSP_Write(X)  SSPDR=(X)
+#define SSP_Read()  SSPDR
+#define SSP_Status()  SSPSR
 
 /** default initial settings */
 #ifndef SPI1_VIC_SLOT
@@ -104,7 +104,38 @@ static void SSP_ISR(void) __attribute__((naked));
 #endif
 
 
-void spi_slave_hs_init(void) {
+// Functions for the generic device API
+static int spi_slave_hs_check_free_space(struct spi_slave_hs *p __attribute__((unused)), uint8_t len __attribute__((unused)))
+{
+  return TRUE;
+}
+
+static void spi_slave_hs_transmit(struct spi_slave_hs *p __attribute__((unused)), uint8_t byte)
+{
+  uint8_t temp = (spi_slave_hs_tx_insert_idx + 1) % SPI_SLAVE_HS_TX_BUFFER_SIZE;
+  if (temp != spi_slave_hs_tx_extract_idx)  /* there is room left */
+  {
+    spi_slave_hs_tx_buffer[spi_slave_hs_tx_insert_idx] = byte;
+    spi_slave_hs_tx_insert_idx = temp;
+  }
+}
+
+static void spi_slave_hs_send(struct spi_slave_hs *p __attribute__((unused))) { }
+
+static int spi_slave_hs_char_available(struct spi_slave_hs *p __attribute__((unused)))
+{
+  return spi_slave_hs_rx_insert_idx != spi_slave_hs_rx_extract_idx;
+}
+
+static uint8_t spi_slave_hs_getch(struct spi_slave_hs *p __attribute__((unused)))
+{
+  uint8_t ret = spi_slave_hs_rx_buffer[spi_slave_hs_rx_extract_idx];
+  spi_slave_hs_rx_extract_idx = (spi_slave_hs_rx_extract_idx + 1)%SPI_SLAVE_HS_RX_BUFFER_SIZE;
+  return ret;
+}
+
+void spi_slave_hs_init(void)
+{
 
   /* setup pins for SSP (SCK, MISO, MOSI) */
   PINSEL1 |= SSP_PINSEL1_SCK  | SSP_PINSEL1_MISO | SSP_PINSEL1_MOSI | SSP_PINSEL1_SSEL;
@@ -117,8 +148,8 @@ void spi_slave_hs_init(void) {
   SSPCPSR = CPSDVSR;
 
   /* initialize interrupt vector */
-  VICIntSelect &= ~VIC_BIT( VIC_SPI1 );             /* SPI1 selected as IRQ */
-  VICIntEnable = VIC_BIT( VIC_SPI1 );               /* enable it            */
+  VICIntSelect &= ~VIC_BIT(VIC_SPI1);               /* SPI1 selected as IRQ */
+  VICIntEnable = VIC_BIT(VIC_SPI1);                 /* enable it            */
   _VIC_CNTL(SPI1_VIC_SLOT) = VIC_ENABLE | VIC_SPI1;
   _VIC_ADDR(SPI1_VIC_SLOT) = (uint32_t)SSP_ISR;      /* address of the ISR   */
 
@@ -129,33 +160,39 @@ void spi_slave_hs_init(void) {
   // Enable Receive interrupt
   SetBit(SSPIMSC, RXIM);
 
+  // Configure generic device
+  spi_slave_hs.device.periph = (void *)(&spi_slave_hs);
+  spi_slave_hs.device.check_free_space = (check_free_space_t) spi_slave_hs_check_free_space;
+  spi_slave_hs.device.put_byte = (put_byte_t) spi_slave_hs_transmit;
+  spi_slave_hs.device.send_message = (send_message_t) spi_slave_hs_send;
+  spi_slave_hs.device.char_available = (char_available_t) spi_slave_hs_char_available;
+  spi_slave_hs.device.get_byte = (get_byte_t) spi_slave_hs_getch;
+
 }
 
 /*
- * 	SSP Status:
+ *  SSP Status:
  *
- * 	ROVR	Read Overrun
- * 	WCOL	Write Collision		(send new byte during a transfer in progress
- * 	ABRT	SSEL inactive before end of transfer
+ *  ROVR  Read Overrun
+ *  WCOL  Write Collision   (send new byte during a transfer in progress
+ *  ABRT  SSEL inactive before end of transfer
  *
  *
  */
 
 
-static void SSP_ISR(void) {
+static void SSP_ISR(void)
+{
   ISR_ENTRY();
 
   //LED_TOGGLE(3);
 
   // If any TX bytes are pending
-  if (spi_slave_hs_tx_insert_idx != spi_slave_hs_tx_extract_idx)
-  {
+  if (spi_slave_hs_tx_insert_idx != spi_slave_hs_tx_extract_idx) {
     uint8_t ret = spi_slave_hs_tx_buffer[spi_slave_hs_tx_extract_idx];
-    spi_slave_hs_tx_extract_idx = (spi_slave_hs_tx_extract_idx + 1)%SPI_SLAVE_HS_TX_BUFFER_SIZE;
+    spi_slave_hs_tx_extract_idx = (spi_slave_hs_tx_extract_idx + 1) % SPI_SLAVE_HS_TX_BUFFER_SIZE;
     SSP_Write(ret);
-  }
-  else
-  {
+  } else {
     SSP_Write(0x00);
   }
 
@@ -165,39 +202,40 @@ static void SSP_ISR(void) {
     uint16_t temp;
 
     // calc next insert index & store character
-    temp = ( spi_slave_hs_rx_insert_idx + 1) % SPI_SLAVE_HS_RX_BUFFER_SIZE;
+    temp = (spi_slave_hs_rx_insert_idx + 1) % SPI_SLAVE_HS_RX_BUFFER_SIZE;
     spi_slave_hs_rx_buffer[ spi_slave_hs_rx_insert_idx] = SSP_Read();
 
     // check for more room in queue
-    if (temp !=  spi_slave_hs_rx_extract_idx)
-       spi_slave_hs_rx_insert_idx = temp; // update insert index
+    if (temp !=  spi_slave_hs_rx_extract_idx) {
+      spi_slave_hs_rx_insert_idx = temp;  // update insert index
+    }
 
     // else overrun
   }
   // while FIFO not empty
   //while (SSPSR & RNE);
 
-/*
-  // loop until not more interrupt sources
-  while (((iid = U0IIR) & UIIR_NO_INT) == 0)
-        while (U0LSR & ULSR_THRE)
-          {
-          // check if more data to send
-          if (uart0_tx_insert_idx != uart0_tx_extract_idx)
+  /*
+    // loop until not more interrupt sources
+    while (((iid = U0IIR) & UIIR_NO_INT) == 0)
+          while (U0LSR & ULSR_THRE)
             {
-            U0THR = uart0_tx_buffer[uart0_tx_extract_idx];
-            uart0_tx_extract_idx++;
-            uart0_tx_extract_idx %= UART0_TX_BUFFER_SIZE;
+            // check if more data to send
+            if (uart0_tx_insert_idx != uart0_tx_extract_idx)
+              {
+              U0THR = uart0_tx_buffer[uart0_tx_extract_idx];
+              uart0_tx_extract_idx++;
+              uart0_tx_extract_idx %= UART0_TX_BUFFER_SIZE;
+              }
+            else
+              {
+              // no
+              uart0_tx_running = 0;       // clear running flag
+              break;
+              }
             }
-          else
-            {
-            // no
-            uart0_tx_running = 0;       // clear running flag
-            break;
-            }
-          }
 
-*/
+  */
   VICVectAddr = 0x00000000; /* clear this interrupt from the VIC */
   ISR_EXIT();
 }

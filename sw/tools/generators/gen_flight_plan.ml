@@ -134,8 +134,21 @@ let print_waypoint_lla = fun utm0 default_alt waypoint ->
   and alt = try sof (float_attrib waypoint "height" +. !ground_alt) with _ -> default_alt in
   let alt = try Xml.attrib waypoint "alt" with _ -> alt in
   let wgs84 = Latlong.of_utm Latlong.WGS84 (Latlong.utm_add utm0 (x, y)) in
-  printf " {%Ld, %Ld, %.0f}, /* 1e7deg, 1e7deg, cm (hmsl=%.2fm) */ \\\n" (convert_angle wgs84.posn_lat) (convert_angle wgs84.posn_long) (100. *. float_of_string alt) (Egm96.of_wgs84 wgs84)
+  printf " {.lat=%Ld, .lon=%Ld, .alt=%.0f}, /* 1e7deg, 1e7deg, mm (above NAV_MSL0, local msl=%.2fm) */ \\\n" (convert_angle wgs84.posn_lat) (convert_angle wgs84.posn_long) (1000. *. float_of_string alt) (Egm96.of_wgs84 wgs84)
 
+let print_waypoint_lla_wgs84 = fun utm0 default_alt waypoint ->
+  let (x, y) = (float_attrib waypoint "x", float_attrib waypoint "y")
+  and alt = try sof (float_attrib waypoint "height" +. !ground_alt) with _ -> default_alt in
+  let alt = try Xml.attrib waypoint "alt" with _ -> alt in
+  let wgs84 = Latlong.of_utm Latlong.WGS84 (Latlong.utm_add utm0 (x, y)) in
+  let alt = float_of_string alt +. Egm96.of_wgs84 wgs84 in
+  printf " {.lat=%Ld, .lon=%Ld, .alt=%.0f}, /* 1e7deg, 1e7deg, mm (above WGS84 ref ellipsoid) */ \\\n" (convert_angle wgs84.posn_lat) (convert_angle wgs84.posn_long) (1000. *. alt)
+
+let print_waypoint_global = fun waypoint ->
+  try
+    let (_, _) = (float_attrib waypoint "lat", float_attrib waypoint "lon") in
+    printf " TRUE, \\\n"
+  with _ -> printf " FALSE, \\\n"
 
 let get_index_block = fun x ->
   try
@@ -494,16 +507,38 @@ let rec print_stage = fun index_of_waypoints x ->
       | "call" ->
         stage ();
         let statement = ExtXml.attrib  x "fun" in
-        lprintf "if (! (%s))\n" statement;
-        lprintf "  NextStageAndBreak();\n";
-        begin
-          try
-            let c = parsed_attrib x "until" in
-            lprintf "if (%s) NextStageAndBreak();\n" c
-          with
-              ExtXml.Error _ -> ()
-        end;
-        lprintf "break;\n"
+        (* by default, function is called while returning TRUE *)
+        (* otherwise, function is called once and returned value is ignored *)
+        let loop = String.uppercase (ExtXml.attrib_or_default x "loop" "TRUE") in
+        (* be default, go to next stage immediately *)
+        let break = String.uppercase (ExtXml.attrib_or_default x "break" "FALSE") in
+        begin match loop with
+        | "TRUE" ->
+            lprintf "if (! (%s)) {\n" statement;
+            begin match break with
+            | "TRUE" -> lprintf "  NextStageAndBreak();\n";
+            | "FALSE" -> lprintf "  NextStage();\n";
+            | _ -> failwith "FP: 'call' break attribute must be TRUE or FALSE";
+            end;
+            lprintf "} else {\n";
+            begin
+              try
+                let c = parsed_attrib x "until" in
+                lprintf "  if (%s) NextStageAndBreak();\n" c
+              with
+                  ExtXml.Error _ -> ()
+            end;
+            lprintf "  break;\n";
+            lprintf "}\n"
+        | "FALSE" ->
+            lprintf "%s;\n" statement;
+            begin match break with
+            | "TRUE" -> lprintf "NextStageAndBreak();\n";
+            | "FALSE" -> lprintf "NextStage();\n";
+            | _ -> failwith "FP: 'call' break attribute must be TRUE or FALSE";
+            end;
+        | _ -> failwith "FP: 'call' loop attribute must be TRUE or FALSE"
+        end
       | "survey_rectangle" ->
         let grid = parsed_attrib x "grid"
         and wp1 = get_index_waypoint (ExtXml.attrib x "wp1") index_of_waypoints
@@ -663,8 +698,8 @@ let dummy_waypoint =
                [])
 
 
-
 let print_inside_polygon = fun pts ->
+  let (_, pts) = List.split pts in
   let layers = Geometry_2d.slice_polygon (Array.of_list pts) in
   let rec f = fun i j ->
     if i = j then
@@ -688,25 +723,51 @@ let print_inside_polygon = fun pts ->
   in
   f 0 (Array.length layers - 1);;
 
-
-
-let print_inside_sector = fun (s, pts) ->
-  lprintf "static inline bool_t %s(float _x, float _y) { \\\n" (inside_function s);
+let print_inside_polygon_global = fun pts ->
+  lprintf "uint8_t i, j;\n";
+  lprintf "bool_t c = FALSE;\n";
+  (* build array of wp id *)
+  let (ids, _) = List.split pts in
+  lprintf "const uint8_t nb_pts = %d;\n" (List.length pts);
+  lprintf "const uint8_t wps_id[] = { %s };\n\n" (String.concat ", " ids);
+  (* start algo *)
+  lprintf "for (i = 0, j = nb_pts - 1; i < nb_pts; j = i++) {\n";
   right ();
-  print_inside_polygon pts;
+  lprintf "if (((WaypointY(wps_id[i]) > _y) != (WaypointY(wps_id[j]) > _y)) &&\n";
+  lprintf "   (_x < (WaypointX(wps_id[j])-WaypointX(wps_id[i])) * (_y-WaypointY(wps_id[i])) / (WaypointY(wps_id[j])-WaypointY(wps_id[i])) + WaypointX(wps_id[i]))) {\n";
+  right ();
+  lprintf "if (c == TRUE) { c = FALSE; } else { c = TRUE; }\n";
+  left();
+  lprintf "}\n";
+  left();
+  lprintf "}\n";
+  lprintf "return c;\n"
+
+
+type sector_type = StaticSector | DynamicSector
+
+let print_inside_sector = fun t (s, pts) ->
+  lprintf "static inline bool_t %s(float _x, float _y) {\n" (inside_function s);
+  right ();
+  begin
+    match t with
+    | StaticSector -> print_inside_polygon pts
+    | DynamicSector -> print_inside_polygon_global pts
+  end;
   left ();
   lprintf "}\n"
 
 
-let parse_wpt_sector = fun waypoints xml ->
+let parse_wpt_sector = fun indexes waypoints xml ->
   let sector_name = ExtXml.attrib xml "name" in
   let p2D_of = fun x ->
     let name = name_of x in
     try
       let wp = List.find (fun wp -> name_of wp = name) waypoints in
+      let i = get_index_waypoint name indexes in
       let x = float_attrib wp "x"
       and y = float_attrib wp "y" in
-      {G2D.x2D = x; G2D.y2D = y }
+      (i, {G2D.x2D = x; G2D.y2D = y })
     with
         Not_found -> failwith (sprintf "Error: corner '%s' of sector '%s' not found" name sector_name)
   in
@@ -757,7 +818,7 @@ let () =
       printf "%s\n" (ExtXml.to_string_fmt dump_xml)
     else begin
       let h_name = "FLIGHT_PLAN_H" in
-      printf "/* This file has been generated from %s */\n" !xml_file;
+      printf "/* This file has been generated by gen_flight_plan from %s */\n" !xml_file;
       printf "/* Please DO NOT EDIT */\n\n";
 
       printf "#ifndef %s\n" h_name;
@@ -775,7 +836,7 @@ let () =
       end;
 
       let name = ExtXml.attrib xml "name" in
-      Xml2h.warning ("FLIGHT PLAN: "^name);
+      (* Xml2h.warning ("FLIGHT PLAN: "^name); *)
       Xml2h.define_string "FLIGHT_PLAN_NAME" name;
 
       let get_float = fun x -> float_attrib xml x in
@@ -815,6 +876,12 @@ let () =
       Xml2h.define "WAYPOINTS_LLA" "{ \\";
       List.iter (print_waypoint_lla utm0 alt) waypoints;
       lprintf "};\n";
+      Xml2h.define "WAYPOINTS_LLA_WGS84" "{ \\";
+      List.iter (print_waypoint_lla_wgs84 utm0 alt) waypoints;
+      lprintf "};\n";
+      Xml2h.define "WAYPOINTS_GLOBAL" "{ \\";
+      List.iter print_waypoint_global waypoints;
+      lprintf "};\n";
       Xml2h.define "NB_WAYPOINT" (string_of_int (List.length waypoints));
 
       Xml2h.define "FP_BLOCKS" "{ \\";
@@ -829,16 +896,18 @@ let () =
       Xml2h.define "HOME_MODE_HEIGHT" (sof home_mode_height);
       Xml2h.define "MAX_DIST_FROM_HOME" (sof mdfh);
 
+      lprintf "\n#ifdef NAV_C\n\n";
+
       let index_of_waypoints =
         let i = ref (-1) in
         List.map (fun w -> incr i; (name_of w, !i)) waypoints in
 
       let sectors_element = try ExtXml.child xml "sectors" with Not_found -> Xml.Element ("", [], []) in
       let sectors = List.filter (fun x -> String.lowercase (Xml.tag x) = "sector") (Xml.children sectors_element) in
-      let sectors =  List.map (parse_wpt_sector waypoints) sectors in
-      List.iter print_inside_sector sectors;
+      let sectors_type = List.map (fun x -> match ExtXml.attrib_or_default x "type" "static" with "dynamic" -> DynamicSector | _ -> StaticSector) sectors in
+      let sectors = List.map (parse_wpt_sector index_of_waypoints waypoints) sectors in
+      List.iter2 print_inside_sector sectors_type sectors;
 
-      lprintf "#ifdef NAV_C\n";
       lprintf "\nstatic inline void auto_nav(void) {\n";
       right ();
       List.iter print_exception global_exceptions;

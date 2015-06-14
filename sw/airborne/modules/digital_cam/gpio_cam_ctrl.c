@@ -35,6 +35,7 @@
 
 #include "gpio_cam_ctrl.h"
 #include "generated/airframe.h"
+#include "generated/modules.h"
 
 // Include Standard Camera Control Interface
 #include "dc.h"
@@ -49,12 +50,14 @@
 #define DC_RELEASE gpio_clear
 #endif
 
+/** how long to push shutter in seconds */
 #ifndef DC_SHUTTER_DELAY
-#define DC_SHUTTER_DELAY 2  /* 4Hz -> 0.5s */
+#define DC_SHUTTER_DELAY 0.5
 #endif
 
+/** how long to send power off in seconds */
 #ifndef DC_POWER_OFF_DELAY
-#define DC_POWER_OFF_DELAY 3
+#define DC_POWER_OFF_DELAY 0.75
 #endif
 
 #ifdef DC_SHUTTER_LED
@@ -96,10 +99,10 @@ void gpio_cam_ctrl_init(void)
 #endif
 }
 
-void gpio_cam_ctrl_periodic( void )
+void gpio_cam_ctrl_periodic(void)
 {
 #ifdef DC_SHOOT_ON_BUTTON_RELEASE
-  if (dc_timer==1) {
+  if (dc_timer == 1) {
     dc_send_shot_position();
   }
 #endif
@@ -123,15 +126,15 @@ void gpio_cam_ctrl_periodic( void )
   }
 
   // Common DC Periodic task
-  dc_periodic_4Hz();
+  dc_periodic();
 }
 
 /* Command The Camera */
 void dc_send_command(uint8_t cmd)
 {
-  dc_timer = DC_SHUTTER_DELAY;
-  switch (cmd)
-  {
+  dc_timer = DC_SHUTTER_DELAY * GPIO_CAM_CTRL_PERIODIC_FREQ;
+
+  switch (cmd) {
     case DC_SHOOT:
       DC_PUSH(DC_SHUTTER_GPIO);
 #ifndef DC_SHOOT_ON_BUTTON_RELEASE
@@ -156,7 +159,7 @@ void dc_send_command(uint8_t cmd)
 #ifdef DC_POWER_OFF_GPIO
     case DC_OFF:
       DC_PUSH(DC_POWER_OFF_GPIO);
-      dc_timer = DC_POWER_OFF_DELAY;
+      dc_timer = DC_POWER_OFF_DELAY * GPIO_CAM_CTRL_PERIODIC_FREQ;
       break;
 #endif
     default:

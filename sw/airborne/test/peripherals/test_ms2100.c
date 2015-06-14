@@ -23,21 +23,22 @@
 #include BOARD_CONFIG
 #include "mcu.h"
 #include "mcu_periph/sys_time.h"
-#include "mcu_periph/uart.h"
 #include "subsystems/datalink/downlink.h"
 #include "peripherals/ms2100.h"
 #include "led.h"
 
-static inline void main_init( void );
-static inline void main_periodic_task( void );
-static inline void main_event_task( void );
+static inline void main_init(void);
+static inline void main_periodic_task(void);
+static inline void main_event_task(void);
 
-int main(void) {
+int main(void)
+{
   main_init();
 
-  while(1) {
-    if (sys_time_check_and_ack_timer(0))
+  while (1) {
+    if (sys_time_check_and_ack_timer(0)) {
       main_periodic_task();
+    }
     main_event_task();
   }
 
@@ -45,36 +46,42 @@ int main(void) {
 }
 
 
-static inline void main_init( void ) {
+static inline void main_init(void)
+{
   mcu_init();
-  sys_time_register_timer((1./50), NULL);
+  sys_time_register_timer((1. / 50), NULL);
 
   ms2100_init(&ms2100, &(MS2100_SPI_DEV), MS2100_SLAVE_IDX);
-
+  downlink_init();
   mcu_int_enable();
 }
 
-static inline void main_periodic_task( void ) {
-  RunOnceEvery(10,
-               {
-                 DOWNLINK_SEND_BOOT(DefaultChannel, DefaultDevice, &sys_time.nb_sec);
-                 LED_TOGGLE(2);
-                 LED_PERIODIC();
-               });
+static inline void main_periodic_task(void)
+{
+  RunOnceEvery(10, {
+    uint16_t foo = sys_time.nb_sec;
+    DOWNLINK_SEND_TAKEOFF(DefaultChannel, DefaultDevice, &foo);
+    LED_TOGGLE(2);
+    LED_PERIODIC();
+  });
 
   ms2100_periodic(&ms2100);
 
 }
 
-static inline void main_event_task( void ) {
+static inline void main_event_task(void)
+{
+  mcu_event();
+
   ms2100_event(&ms2100);
   if (ms2100.status == MS2100_DATA_AVAILABLE) {
     RunOnceEvery(10, {
-        DOWNLINK_SEND_IMU_MAG_RAW(DefaultChannel, DefaultDevice,
-                                  &ms2100.data.vect.x,
-                                  &ms2100.data.vect.y,
-                                  &ms2100.data.vect.z);
-      });
+      int32_t mag_x = ms2100.data.vect.x;
+      int32_t mag_y = ms2100.data.vect.y;
+      int32_t mag_z = ms2100.data.vect.z;
+      DOWNLINK_SEND_IMU_MAG_RAW(DefaultChannel, DefaultDevice,
+      &mag_x, &mag_y, &mag_z);
+    });
     ms2100.status = MS2100_IDLE;
   }
 }

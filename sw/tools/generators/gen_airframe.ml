@@ -83,6 +83,8 @@ let convert_value_with_code_unit_coef_of_xml = function xml ->
   (* if unit attribute is not specified don't even attempt to convert the units *)
   let u = try Xml.attrib xml "unit" with _ -> failwith "Unit conversion error" in
   let cu = ExtXml.attrib_or_default xml "code_unit" "" in
+  (* if unit equals code unit, don't convert as that would always result in a float *)
+  if u = cu then failwith "Not converting";
   (* default value for code_unit is rad[/s] when unit is deg[/s] *)
   let conv = try (Pprz.scale_of_units u cu) with
     | Pprz.Unit_conversion_error s -> prerr_endline (sprintf "Unit conversion error: %s" s); flush stderr; exit 1
@@ -91,21 +93,52 @@ let convert_value_with_code_unit_coef_of_xml = function xml ->
   let v = try ExtXml.float_attrib xml "value" with _ -> prerr_endline (sprintf "Error: Unit conversion of parameter %s impossible because '%s' is not a float" (Xml.attrib xml "name") (Xml.attrib xml "value")); flush stderr; exit 1 in
   v *. conv
 
+let array_sep = Str.regexp "[,;]"
+let rec string_from_type = fun name v t ->
+  let sprint_array = fun v t ->
+    let vs = Str.split array_sep v in
+    let sl = List.map (fun vl -> string_from_type name vl t) vs in
+    "{ "^(String.concat " , " sl)^" }"
+  in
+  let rm_leading_trailing_spaces = fun s ->
+    let s = Str.global_replace (Str.regexp "^ *") "" s in
+    Str.global_replace (Str.regexp " *$") "" s
+  in
+  match t with
+  | "float" ->
+      begin
+        try
+          string_of_float (float_of_string (rm_leading_trailing_spaces v))
+        with _ -> prerr_endline (sprintf "Define value %s = %s is not compatible with type float" name v); flush stderr; exit 1
+      end
+  | "int" ->
+      begin
+        try
+          string_of_int (int_of_string (rm_leading_trailing_spaces v))
+        with _ -> prerr_endline (sprintf "Define value %s = %s is not compatible with type int" name v); flush stderr; exit 1
+      end
+  | "string" -> "\""^(rm_leading_trailing_spaces v)^"\""
+  | "array" -> sprint_array v ""
+  | "float[]" -> sprint_array v "float"
+  | "int[]" -> sprint_array v "int"
+  | "string[]" -> sprint_array v "string"
+  | _ -> v
+
 
 let parse_element = fun prefix s ->
   match Xml.tag s with
       "define" -> begin
         try
-          begin
-            (* fail if units conversion is not found and just copy value instead,
-               this is important for integer values, you can't just multiply them with 1.0 *)
-            try
-              let value = (convert_value_with_code_unit_coef_of_xml s) in
-              define (prefix^ExtXml.attrib s "name") (string_of_float value);
-            with
-                _ -> define (prefix^ExtXml.attrib s "name") (ExtXml.display_entities (ExtXml.attrib s "value"));
-          end;
-          define_integer (prefix^(ExtXml.attrib s "name")) (ExtXml.float_attrib s "value") (ExtXml.int_attrib s "integer");
+          (* fail if units conversion is not found and just copy value instead,
+             this is important for integer values, you can't just multiply them with 1.0 *)
+          let value =
+            try string_of_float (convert_value_with_code_unit_coef_of_xml s)
+            with _ -> ExtXml.display_entities (ExtXml.attrib s "value")
+          in
+          let name = (prefix^ExtXml.attrib s "name") in
+          let t = ExtXml.attrib_or_default s "type" "" in
+          define name (string_from_type name value t);
+          define_integer name (ExtXml.float_attrib s "value") (ExtXml.int_attrib s "integer");
         with _ -> ();
       end
     | "linear" ->
@@ -317,7 +350,7 @@ let _ =
   and md5sum = Sys.argv.(3) in
   try
     let xml = start_and_begin xml_file h_name in
-    Xml2h.warning ("AIRFRAME MODEL: "^ ac_name);
+    (* Xml2h.warning ("AIRFRAME MODEL: "^ ac_name); *)
     define_string "AIRFRAME_NAME" ac_name;
     define "AC_ID" ac_id;
     define "MD5SUM" (sprintf "((uint8_t*)\"%s\")" (hex_to_bin md5sum));

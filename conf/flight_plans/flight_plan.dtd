@@ -77,7 +77,8 @@ height CDATA #IMPLIED>
 
 <!ATTLIST sector
 name CDATA #REQUIRED
-color CDATA #IMPLIED>
+color CDATA #IMPLIED
+type CDATA #IMPLIED>
 
 <!ATTLIST corner
 name CDATA #REQUIRED>
@@ -162,7 +163,9 @@ value CDATA #REQUIRED>
 
 <!ATTLIST call
 fun CDATA #REQUIRED
-until CDATA #IMPLIED>
+until CDATA #IMPLIED
+loop CDATA #IMPLIED
+break CDATA #IMPLIED>
 
 <!ATTLIST follow
 ac_id CDATA #REQUIRED

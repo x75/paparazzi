@@ -7,11 +7,9 @@ before_install:
   - sudo add-apt-repository ppa:terry.guo/gcc-arm-embedded -y
   - sudo apt-get update -q
 install:
-  - sudo apt-get install paparazzi-dev paparazzi-jsbsim gcc-arm-none-eabi
-before_script: cd conf && ln -s conf_tests.xml conf.xml && cd ..
+  - sudo apt-get install paparazzi-dev paparazzi-jsbsim gcc-arm-none-eabi libipc-run-perl
 script:
-  - make
-  - make run_tests J=AUTO TEST_FILES=examples/01_compile_all_test_targets.t
+  - make test
 
 notifications:
   webhooks:

@@ -21,183 +21,117 @@
 
 #include <inttypes.h>
 
+#define DATALINK_C
+
+/* PERIODIC_C_MAIN is defined before generated/periodic_telemetry.h
+ * in order to implement telemetry_mode_Main_*
+ */
+#define PERIODIC_C_MAIN
+
+#include "generated/periodic_telemetry.h"
+
+#define ABI_C
+#include "subsystems/abi.h"
+
 #include "std.h"
 #include "mcu.h"
 #include "mcu_periph/sys_time.h"
 #include "led.h"
-#include "mcu_periph/uart.h"
 #include "mcu_periph/i2c.h"
 #include "messages.h"
 #include "subsystems/datalink/downlink.h"
+#include "subsystems/datalink/telemetry.h"
+
+#include "subsystems/datalink/datalink.h"
+#include "generated/settings.h"
 
 #include "subsystems/imu.h"
 #include "subsystems/ahrs.h"
 #include "subsystems/ahrs/ahrs_aligner.h"
 
-#include "my_debug_servo.h"
-
-static inline void main_init( void );
-static inline void main_periodic_task( void );
-static inline void main_event_task( void );
+static inline void main_init(void);
+static inline void main_periodic_task(void);
+static inline void main_event_task(void);
 static inline void main_report(void);
 
-static inline void on_gyro_event(void);
-static inline void on_accel_event(void);
-static inline void on_mag_event(void);
+uint16_t datalink_time = 0;
 
-int main( void ) {
+int main(void)
+{
   main_init();
-  while(1) {
-    if (sys_time_check_and_ack_timer(0))
+  while (1) {
+    if (sys_time_check_and_ack_timer(0)) {
       main_periodic_task();
+    }
     main_event_task();
   }
   return 0;
 }
 
-static inline void main_init( void ) {
-
+static inline void main_init(void)
+{
   mcu_init();
-  sys_time_register_timer((1./PERIODIC_FREQUENCY), NULL);
+  sys_time_register_timer((1. / PERIODIC_FREQUENCY), NULL);
   imu_init();
+#if USE_AHRS_ALIGNER
   ahrs_aligner_init();
+#endif
   ahrs_init();
-
-  DEBUG_SERVO1_INIT();
-  //  DEBUG_SERVO2_INIT();
+  downlink_init();
 
   mcu_int_enable();
 }
 
-static inline void main_periodic_task( void ) {
-
-  if (sys_time.nb_sec > 1) imu_periodic();
+static inline void main_periodic_task(void)
+{
+  if (sys_time.nb_sec > 1) {
+    imu_periodic();
+  }
   RunOnceEvery(10, { LED_PERIODIC();});
+  RunOnceEvery(PERIODIC_FREQUENCY, { datalink_time++; });
   main_report();
 }
 
-static inline void main_event_task( void ) {
-
-  ImuEvent(on_gyro_event, on_accel_event, on_mag_event);
-
+static inline void main_event_task(void)
+{
+  mcu_event();
+  DatalinkEvent();
+  ImuEvent();
 }
 
-static inline void on_gyro_event(void) {
-  ImuScaleGyro(imu);
-  if (ahrs.status == AHRS_UNINIT) {
-    ahrs_aligner_run();
-    if (ahrs_aligner.status == AHRS_ALIGNER_LOCKED)
-      ahrs_align();
-  }
-  else {
-    DEBUG_S1_ON();
-    ahrs_propagate();
-    DEBUG_S1_OFF();
-  }
+static inline void main_report(void)
+{
+  RunOnceEvery(512, DOWNLINK_SEND_ALIVE(DefaultChannel, DefaultDevice, 16, MD5SUM));
+
+  periodic_telemetry_send_Main(DefaultPeriodic, &(DefaultChannel).trans_tx, &(DefaultDevice).device);
 }
 
-static inline void on_accel_event(void) {
-  ImuScaleAccel(imu);
-  if (ahrs.status != AHRS_UNINIT) {
-    DEBUG_S2_ON();
-    ahrs_update_accel();
-    DEBUG_S2_OFF();
+void dl_parse_msg(void)
+{
+  datalink_time = 0;
+  uint8_t msg_id = dl_buffer[1];
+  switch (msg_id) {
+
+    case  DL_PING: {
+      DOWNLINK_SEND_PONG(DefaultChannel, DefaultDevice);
+    }
+    break;
+    case DL_SETTING:
+      if (DL_SETTING_ac_id(dl_buffer) == AC_ID) {
+        uint8_t i = DL_SETTING_index(dl_buffer);
+        float val = DL_SETTING_value(dl_buffer);
+        DlSetting(i, val);
+        DOWNLINK_SEND_DL_VALUE(DefaultChannel, DefaultDevice, &i, &val);
+      }
+      break;
+    case DL_GET_SETTING : {
+      if (DL_GET_SETTING_ac_id(dl_buffer) != AC_ID) { break; }
+      uint8_t i = DL_GET_SETTING_index(dl_buffer);
+      float val = settings_get_value(i);
+      DOWNLINK_SEND_DL_VALUE(DefaultChannel, DefaultDevice, &i, &val);
+    }
+    break;
+    default:
+      break;
   }
-}
-
-static inline void on_mag_event(void) {
-  ImuScaleMag(imu);
-  if (ahrs.status == AHRS_RUNNING) {
-    ahrs_update_mag();
-  }
-}
-
-
-static inline void main_report(void) {
-
-  PeriodicPrescaleBy10(
-           {
-       DOWNLINK_SEND_IMU_ACCEL_RAW(DefaultChannel, DefaultDevice,
-                 &imu.accel_unscaled.x,
-                 &imu.accel_unscaled.y,
-                 &imu.accel_unscaled.z);
-           },
-           {
-       DOWNLINK_SEND_IMU_GYRO_RAW(DefaultChannel, DefaultDevice,
-                &imu.gyro_unscaled.p,
-                &imu.gyro_unscaled.q,
-                &imu.gyro_unscaled.r);
-           },
-           {
-       DOWNLINK_SEND_IMU_MAG_RAW(DefaultChannel, DefaultDevice,
-               &imu.mag_unscaled.x,
-               &imu.mag_unscaled.y,
-               &imu.mag_unscaled.z);
-           },
-           {
-       DOWNLINK_SEND_IMU_ACCEL_SCALED(DefaultChannel, DefaultDevice,
-               &imu.accel.x,
-               &imu.accel.y,
-               &imu.accel.z);
-           },
-           {
-       DOWNLINK_SEND_IMU_GYRO_SCALED(DefaultChannel, DefaultDevice,
-              &imu.gyro.p,
-              &imu.gyro.q,
-              &imu.gyro.r);
-           },
-
-           {
-       DOWNLINK_SEND_IMU_MAG_SCALED(DefaultChannel, DefaultDevice,
-             &imu.mag.x,
-             &imu.mag.y,
-             &imu.mag.z);
-           },
-
-           {
-       DOWNLINK_SEND_ALIVE(DefaultChannel, DefaultDevice, 16, MD5SUM);
-           },
-           {
-#if USE_I2C2
-                 uint16_t i2c2_queue_full_cnt        = i2c2.errors->queue_full_cnt;
-                 uint16_t i2c2_ack_fail_cnt          = i2c2.errors->ack_fail_cnt;
-                 uint16_t i2c2_miss_start_stop_cnt   = i2c2.errors->miss_start_stop_cnt;
-                 uint16_t i2c2_arb_lost_cnt          = i2c2.errors->arb_lost_cnt;
-                 uint16_t i2c2_over_under_cnt        = i2c2.errors->over_under_cnt;
-                 uint16_t i2c2_pec_recep_cnt         = i2c2.errors->pec_recep_cnt;
-                 uint16_t i2c2_timeout_tlow_cnt      = i2c2.errors->timeout_tlow_cnt;
-                 uint16_t i2c2_smbus_alert_cnt       = i2c2.errors->smbus_alert_cnt;
-                 uint16_t i2c2_unexpected_event_cnt  = i2c2.errors->unexpected_event_cnt;
-                 uint32_t i2c2_last_unexpected_event = i2c2.errors->last_unexpected_event;
-                 const uint8_t _bus2 = 2;
-                 DOWNLINK_SEND_I2C_ERRORS(DefaultChannel, DefaultDevice,
-                                          &i2c2_queue_full_cnt,
-                                          &i2c2_ack_fail_cnt,
-                                          &i2c2_miss_start_stop_cnt,
-                                          &i2c2_arb_lost_cnt,
-                                          &i2c2_over_under_cnt,
-                                          &i2c2_pec_recep_cnt,
-                                          &i2c2_timeout_tlow_cnt,
-                                          &i2c2_smbus_alert_cnt,
-                                          &i2c2_unexpected_event_cnt,
-                                          &i2c2_last_unexpected_event,
-                                          &_bus2);
-#endif
-           },
-           {
-       DOWNLINK_SEND_AHRS_EULER_INT(DefaultChannel, DefaultDevice,
-              &ahrs.ltp_to_imu_euler.phi,
-              &ahrs.ltp_to_imu_euler.theta,
-              &ahrs.ltp_to_imu_euler.psi,
-              &ahrs.ltp_to_body_euler.phi,
-              &ahrs.ltp_to_body_euler.theta,
-              &ahrs.ltp_to_body_euler.psi);
-           },
-           {
-       DOWNLINK_SEND_AHRS_GYRO_BIAS_INT(DefaultChannel, DefaultDevice,
-                  &ahrs_impl.gyro_bias.p,
-                  &ahrs_impl.gyro_bias.q,
-                  &ahrs_impl.gyro_bias.r);
-
-           });
 }

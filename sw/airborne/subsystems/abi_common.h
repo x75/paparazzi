@@ -32,6 +32,7 @@
 #include "std.h"
 #include "math/pprz_algebra_int.h"
 #include "math/pprz_algebra_float.h"
+#include "subsystems/gps.h"
 /* Include here headers with structure definition you may want to use with ABI
  * Ex: '#include "subsystems/gps.h"' in order to use the GpsState structure
  */
@@ -58,7 +59,7 @@ typedef void (*abi_callback)(void);
 struct abi_struct {
   uint8_t id;
   abi_callback cb;
-  struct abi_struct * next;
+  struct abi_struct *next;
 };
 typedef struct abi_struct abi_event;
 

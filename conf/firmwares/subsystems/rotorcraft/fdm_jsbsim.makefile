@@ -12,9 +12,6 @@ SRC_FIRMWARE=firmwares/rotorcraft
 
 SRC_BOARD=boards/$(BOARD)
 
-NPSDIR = $(SIMDIR)/nps
-
-
 nps.ARCHDIR = sim
 
 # include Makefile.nps instead of Makefile.sim
@@ -23,7 +20,7 @@ nps.MAKEFILE = nps
 nps.CFLAGS  += -DSITL -DUSE_NPS
 nps.CFLAGS  += $(shell pkg-config glib-2.0 --cflags)
 nps.LDFLAGS += $(shell pkg-config glib-2.0 --libs) -lm -lglibivy $(shell pcre-config --libs) -lgsl -lgslcblas
-nps.CFLAGS  += -I$(NPSDIR) -I$(SRC_FIRMWARE) -I$(SRC_BOARD) -I../simulator -I$(PAPARAZZI_HOME)/conf/simulator/nps
+nps.CFLAGS  += -I$(SRC_FIRMWARE) -I$(SRC_BOARD) -I$(PAPARAZZI_SRC)/sw/simulator -I$(PAPARAZZI_SRC)/sw/simulator/nps -I$(PAPARAZZI_HOME)/conf/simulator/nps
 nps.LDFLAGS += $(shell sdl-config --libs)
 
 # use the paparazzi-jsbsim package if it is installed, otherwise look for JSBsim under /opt/jsbsim
@@ -37,7 +34,12 @@ else
 	nps.LDFLAGS += -L$(JSBSIM_LIB) -lJSBSim
 endif
 
+#
+# add the simulator directory to the make searchpath
+#
+VPATH = $(PAPARAZZI_SRC)/sw/simulator
 
+NPSDIR = nps
 nps.srcs += $(NPSDIR)/nps_main.c                 \
        $(NPSDIR)/nps_fdm_jsbsim.cpp              \
        $(NPSDIR)/nps_random.c                    \
@@ -58,69 +60,11 @@ nps.srcs += $(NPSDIR)/nps_main.c                 \
        $(NPSDIR)/nps_ivy_common.c                \
        $(NPSDIR)/nps_ivy_rotorcraft.c            \
        $(NPSDIR)/nps_flightgear.c                \
+       $(NPSDIR)/nps_ivy_mission_commands.c
 
+# for geo mag calculation
+nps.srcs += math/pprz_geodetic_wmm2010.c
 
-
-nps.CFLAGS += -DBOARD_CONFIG=$(BOARD_CFG) -DPERIPHERALS_AUTO_INIT
-
-nps.srcs += firmwares/rotorcraft/main.c
-nps.srcs += mcu.c
-nps.srcs += $(SRC_ARCH)/mcu_arch.c
-
-nps.srcs += mcu_periph/i2c.c
-nps.srcs += $(SRC_ARCH)/mcu_periph/i2c_arch.c
-
-
-PERIODIC_FREQUENCY ?= 512
-nps.CFLAGS += -DPERIODIC_FREQUENCY=$(PERIODIC_FREQUENCY)
-#nps.CFLAGS += -DUSE_LED
-nps.srcs += mcu_periph/sys_time.c $(SRC_ARCH)/mcu_periph/sys_time_arch.c
-
-nps.srcs += subsystems/settings.c
-nps.srcs += $(SRC_ARCH)/subsystems/settings_arch.c
-
-nps.CFLAGS += -DDOWNLINK -DPERIODIC_TELEMETRY -DDOWNLINK_TRANSPORT=IvyTransport -DDefaultPeriodic='&telemetry_Main'
-nps.srcs += $(SRC_ARCH)/ivy_transport.c
-nps.srcs += subsystems/datalink/downlink.c subsystems/datalink/telemetry.c
+include $(CFG_SHARED)/telemetry_ivy.makefile
 nps.srcs += $(SRC_FIRMWARE)/rotorcraft_telemetry.c
 nps.srcs += $(SRC_FIRMWARE)/datalink.c
-
-nps.srcs   += subsystems/actuators.c
-nps.srcs   += subsystems/commands.c
-
-USE_MISSION_COMMANDS_IN_NPS ?= 0
-ifeq ($(USE_MISSION_COMMANDS_IN_NPS), 1)
-nps.srcs += $(NPSDIR)/nps_ivy_mission_commands.c
-nps.CFLAGS += -DUSE_MISSION_COMMANDS_IN_NPS
-endif
-
-#
-# Math functions
-#
-nps.srcs += math/pprz_geodetic_int.c math/pprz_geodetic_float.c math/pprz_geodetic_double.c math/pprz_trig_int.c math/pprz_orientation_conversion.c math/pprz_geodetic_wmm2010.c
-
-nps.srcs += subsystems/air_data.c
-
-nps.CFLAGS += -DUSE_ADC
-nps.srcs   += $(SRC_ARCH)/mcu_periph/adc_arch.c
-nps.srcs   += subsystems/electrical.c
-
-nps.srcs += $(SRC_FIRMWARE)/autopilot.c
-
-nps.srcs += state.c
-
-
-nps.srcs += $(SRC_FIRMWARE)/stabilization.c
-nps.srcs += $(SRC_FIRMWARE)/stabilization/stabilization_rate.c
-nps.srcs += $(SRC_FIRMWARE)/stabilization/stabilization_none.c
-
-nps.CFLAGS += -DUSE_NAVIGATION
-nps.srcs += $(SRC_FIRMWARE)/guidance/guidance_h.c
-nps.srcs += $(SRC_FIRMWARE)/guidance/guidance_h_ref.c
-nps.srcs += $(SRC_FIRMWARE)/guidance/guidance_v.c
-nps.srcs += $(SRC_FIRMWARE)/guidance/guidance_v_ref.c
-nps.srcs += $(SRC_FIRMWARE)/guidance/guidance_v_adapt.c
-
-
-nps.srcs += $(SRC_FIRMWARE)/navigation.c
-nps.srcs += $(SRC_SUBSYSTEMS)/navigation/common_flight_plan.c

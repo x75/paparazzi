@@ -27,30 +27,33 @@
 #include "file_logger.h"
 
 #include <stdio.h>
+#include "std.h"
+
 #include "subsystems/imu.h"
 #include "firmwares/rotorcraft/stabilization.h"
 #include "state.h"
 
 /** Set the default File logger path to the USB drive */
 #ifndef FILE_LOGGER_PATH
-#define FILE_LOGGER_PATH "/data/video/usb/"
+#define FILE_LOGGER_PATH /data/video/usb
 #endif
 
 /** The file pointer */
-static FILE* file_logger;
+static FILE *file_logger = NULL;
 
 /** Start the file logger and open a new file */
-void file_logger_start(void) {
+void file_logger_start(void)
+{
   uint32_t counter = 0;
   char filename[512];
 
   // Check for available files
-  sprintf(filename, "%s%05d.csv", FILE_LOGGER_PATH, counter);
+  sprintf(filename, "%s/%05d.csv", STRINGIFY(FILE_LOGGER_PATH), counter);
   while ((file_logger = fopen(filename, "r"))) {
     fclose(file_logger);
 
     counter++;
-    sprintf(filename, "%s%05d.csv", FILE_LOGGER_PATH, counter);
+    sprintf(filename, "%s/%05d.csv", STRINGIFY(FILE_LOGGER_PATH), counter);
   }
 
   file_logger = fopen(filename, "w");
@@ -64,9 +67,12 @@ void file_logger_start(void) {
 }
 
 /** Stop the logger an nicely close the file */
-void file_logger_stop(void) {
-  fclose(file_logger);
-  file_logger = NULL;
+void file_logger_stop(void)
+{
+  if (file_logger != NULL) {
+    fclose(file_logger);
+    file_logger = NULL;
+  }
 }
 
 /** Log the values to a csv file */
@@ -76,27 +82,27 @@ void file_logger_periodic(void)
     return;
   }
   static uint32_t counter;
-  struct Int32Quat* quat = stateGetNedToBodyQuat_i();
+  struct Int32Quat *quat = stateGetNedToBodyQuat_i();
 
   fprintf(file_logger, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-    counter,
-    imu.gyro_unscaled.p,
-    imu.gyro_unscaled.q,
-    imu.gyro_unscaled.r,
-    imu.accel_unscaled.x,
-    imu.accel_unscaled.y,
-    imu.accel_unscaled.z,
-    imu.mag_unscaled.x,
-    imu.mag_unscaled.y,
-    imu.mag_unscaled.z,
-    stabilization_cmd[COMMAND_THRUST],
-    stabilization_cmd[COMMAND_ROLL],
-    stabilization_cmd[COMMAND_PITCH],
-    stabilization_cmd[COMMAND_YAW],
-    quat->qi,
-    quat->qx,
-    quat->qy,
-    quat->qz
-  );
+          counter,
+          imu.gyro_unscaled.p,
+          imu.gyro_unscaled.q,
+          imu.gyro_unscaled.r,
+          imu.accel_unscaled.x,
+          imu.accel_unscaled.y,
+          imu.accel_unscaled.z,
+          imu.mag_unscaled.x,
+          imu.mag_unscaled.y,
+          imu.mag_unscaled.z,
+          stabilization_cmd[COMMAND_THRUST],
+          stabilization_cmd[COMMAND_ROLL],
+          stabilization_cmd[COMMAND_PITCH],
+          stabilization_cmd[COMMAND_YAW],
+          quat->qi,
+          quat->qx,
+          quat->qy,
+          quat->qz
+         );
   counter++;
 }

@@ -28,20 +28,21 @@
  */
 
 #include "subsystems/gps.h"
-
-bool_t gps_available;   ///< Is set to TRUE when a new REMOTE_GPS packet is received and parsed
+#include "subsystems/abi.h"
 
 /** GPS initialization */
-void gps_impl_init(void) {
+void gps_impl_init(void)
+{
   gps.fix = GPS_FIX_NONE;
-  gps_available = FALSE;
   gps.gspeed = 700; // To enable course setting
   gps.cacc = 0; // To enable course setting
 }
 
 /** Parse the REMOTE_GPS datalink packet */
-void parse_gps_datalink(uint8_t numsv, int32_t ecef_x, int32_t ecef_y, int32_t ecef_z, int32_t lat, int32_t lon, int32_t alt,
-  int32_t hmsl, int32_t ecef_xd, int32_t ecef_yd, int32_t ecef_zd, uint32_t tow, int32_t course) {
+void parse_gps_datalink(uint8_t numsv, int32_t ecef_x, int32_t ecef_y, int32_t ecef_z, int32_t lat, int32_t lon,
+                        int32_t alt,
+                        int32_t hmsl, int32_t ecef_xd, int32_t ecef_yd, int32_t ecef_zd, uint32_t tow, int32_t course)
+{
 
   gps.lla_pos.lat = lat;
   gps.lla_pos.lon = lon;
@@ -60,7 +61,6 @@ void parse_gps_datalink(uint8_t numsv, int32_t ecef_x, int32_t ecef_y, int32_t e
   gps.num_sv = numsv;
   gps.tow = tow;
   gps.fix = GPS_FIX_3D;
-  gps_available = TRUE;
 
 #if GPS_USE_LATLONG
   // Computes from (lat, long) in the referenced UTM zone
@@ -71,10 +71,20 @@ void parse_gps_datalink(uint8_t numsv, int32_t ecef_x, int32_t ecef_y, int32_t e
   // convert to utm
   utm_of_lla_f(&utm_f, &lla_f);
   // copy results of utm conversion
-  gps.utm_pos.east = utm_f.east*100;
-  gps.utm_pos.north = utm_f.north*100;
+  gps.utm_pos.east = utm_f.east * 100;
+  gps.utm_pos.north = utm_f.north * 100;
   gps.utm_pos.alt = gps.lla_pos.alt;
   gps.utm_pos.zone = nav_utm_zone0;
 #endif
+
+  // publish new GPS data
+  uint32_t now_ts = get_sys_time_usec();
+  gps.last_msg_ticks = sys_time.nb_sec_rem;
+  gps.last_msg_time = sys_time.nb_sec;
+  if (gps.fix == GPS_FIX_3D) {
+    gps.last_3dfix_ticks = sys_time.nb_sec_rem;
+    gps.last_3dfix_time = sys_time.nb_sec;
+  }
+  AbiSendMsgGPS(GPS_DATALINK_ID, now_ts, &gps);
 }
 

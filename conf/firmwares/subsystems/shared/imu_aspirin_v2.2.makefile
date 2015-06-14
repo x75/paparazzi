@@ -53,5 +53,8 @@ else ifeq ($(ARCH), stm32)
 IMU_ASPIRIN_2_CFLAGS += -DUSE_SPI_SLAVE3
 endif
 
-ap.CFLAGS += $(IMU_ASPIRIN_2_CFLAGS)
-ap.srcs   += $(IMU_ASPIRIN_2_SRCS)
+# add it for all targets except sim, fbw and nps
+ifeq (,$(findstring $(TARGET),sim fbw nps))
+$(TARGET).CFLAGS += $(IMU_ASPIRIN_2_CFLAGS)
+$(TARGET).srcs += $(IMU_ASPIRIN_2_SRCS)
+endif

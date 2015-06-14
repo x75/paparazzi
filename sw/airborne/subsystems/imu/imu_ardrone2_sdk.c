@@ -21,17 +21,19 @@
 
 /**
  * @file subsystems/imu/imu_ardrone2_sdk.c
- * IMU implementation for ardrone2-sdk.
+ * dummy IMU implementation for ardrone2-sdk.
  */
 
 #include "subsystems/imu.h"
 #include "imu_ardrone2_sdk.h"
 
 
-void imu_impl_init(void) {
+void imu_impl_init(void)
+{
 
 }
 
-void imu_periodic(void) {
+void imu_periodic(void)
+{
 
 }

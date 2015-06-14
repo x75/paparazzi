@@ -49,16 +49,32 @@ endif
 
 $(TARGET).CFLAGS 	+= -DTRAFFIC_INFO
 
-
-
 #
-# Sys-time
+# frequencies
 #
 PERIODIC_FREQUENCY ?= 60
 $(TARGET).CFLAGS += -DPERIODIC_FREQUENCY=$(PERIODIC_FREQUENCY)
 
+ifdef AHRS_PROPAGATE_FREQUENCY
+$(TARGET).CFLAGS += -DAHRS_PROPAGATE_FREQUENCY=$(AHRS_PROPAGATE_FREQUENCY)
+endif
+
+ifdef AHRS_CORRECT_FREQUENCY
+$(TARGET).CFLAGS += -DAHRS_CORRECT_FREQUENCY=$(AHRS_CORRECT_FREQUENCY)
+endif
+
+ifdef AHRS_MAG_CORRECT_FREQUENCY
+$(TARGET).CFLAGS += -DAHRS_MAG_CORRECT_FREQUENCY=$(AHRS_MAG_CORRECT_FREQUENCY)
+endif
+
+#
+# Sys-time
+#
 $(TARGET).srcs   += mcu_periph/sys_time.c $(SRC_ARCH)/mcu_periph/sys_time_arch.c
-$(TARGET).CFLAGS += -DUSE_SYS_TIME
+ifeq ($(ARCH), linux)
+# seems that we need to link against librt for glibc < 2.17
+$(TARGET).LDFLAGS += -lrt
+endif
 
 #
 # InterMCU & Commands
@@ -69,14 +85,17 @@ $(TARGET).srcs 		+= $(SRC_FIXEDWING)/inter_mcu.c
 #
 # Math functions
 #
-$(TARGET).srcs += math/pprz_geodetic_int.c math/pprz_geodetic_float.c math/pprz_geodetic_double.c math/pprz_trig_int.c math/pprz_orientation_conversion.c
+ifneq ($(TARGET),fbw)
+$(TARGET).srcs += math/pprz_geodetic_int.c math/pprz_geodetic_float.c math/pprz_geodetic_double.c math/pprz_trig_int.c math/pprz_orientation_conversion.c math/pprz_algebra_int.c math/pprz_algebra_float.c math/pprz_algebra_double.c
+endif
 
 #
 # I2C
 #
+ifneq ($(TARGET),fbw)
 $(TARGET).srcs += mcu_periph/i2c.c
 $(TARGET).srcs += $(SRC_ARCH)/mcu_periph/i2c_arch.c
-
+endif
 
 ######################################################################
 ##
@@ -141,7 +160,6 @@ fbw_srcs 		+= $(SRC_FIRMWARE)/main_fbw.c
 fbw_srcs 		+= subsystems/electrical.c
 fbw_srcs 		+= subsystems/commands.c
 fbw_srcs 		+= subsystems/actuators.c
-fbw_srcs		+= $(SRC_FIRMWARE)/fbw_downlink.c
 
 ######################################################################
 ##
@@ -149,17 +167,12 @@ fbw_srcs		+= $(SRC_FIRMWARE)/fbw_downlink.c
 ##
 
 ap_CFLAGS 		+= -DAP
-ap_CFLAGS 		+= -DDefaultPeriodic='&telemetry_Ap'
 ap_srcs 		+= $(SRC_FIRMWARE)/main_ap.c
 ap_srcs 		+= $(SRC_FIRMWARE)/autopilot.c
-ap_srcs			+= $(SRC_FIRMWARE)/ap_downlink.c
-ap_srcs         += subsystems/datalink/telemetry.c
 ap_srcs 		+= state.c
 ap_srcs 		+= subsystems/settings.c
 ap_srcs 		+= $(SRC_ARCH)/subsystems/settings_arch.c
 
-# AIR DATA
-ap_srcs += subsystems/air_data.c
 
 # BARO
 include $(CFG_SHARED)/baro_board.makefile
@@ -182,50 +195,13 @@ sim.srcs 		+= $(fbw_srcs) $(ap_srcs)
 sim.CFLAGS 		+= -DSITL
 sim.srcs 		+= $(SRC_ARCH)/sim_ap.c
 
-sim.CFLAGS 		+= -DDOWNLINK -DPERIODIC_TELEMETRY -DDOWNLINK_TRANSPORT=IvyTransport
-sim.srcs 		+= subsystems/datalink/downlink.c $(SRC_FIRMWARE)/datalink.c $(SRC_ARCH)/ivy_transport.c
+sim.CFLAGS 		+= -DDOWNLINK -DPERIODIC_TELEMETRY -DDOWNLINK_TRANSPORT=ivy_tp -DDOWNLINK_DEVICE=ivy_tp
+sim.srcs 		+= subsystems/datalink/downlink.c $(SRC_FIRMWARE)/datalink.c subsystems/datalink/ivy_transport.c subsystems/datalink/telemetry.c $(SRC_FIRMWARE)/ap_downlink.c $(SRC_FIRMWARE)/fbw_downlink.c
 
 sim.srcs 		+= $(SRC_ARCH)/sim_gps.c $(SRC_ARCH)/sim_adc_generic.c
 
 # hack: always compile some of the sim functions, so ocaml sim does not complain about no-existing functions
 sim.srcs        += $(SRC_ARCH)/sim_ahrs.c $(SRC_ARCH)/sim_ir.c
-
-######################################################################
-##
-## JSBSIM THREAD SPECIFIC
-##
-
-JSBSIM_ROOT ?= /opt/jsbsim
-JSBSIM_INC = $(JSBSIM_ROOT)/include/JSBSim
-JSBSIM_LIB = $(JSBSIM_ROOT)/lib
-
-# use the paparazzi-jsbsim package if it is installed,
-# otherwise look for JSBsim under /opt/jsbsim
-JSBSIM_PKG ?= $(shell pkg-config JSBSim --exists && echo 'yes')
-ifeq ($(JSBSIM_PKG), yes)
-	jsbsim.CFLAGS  += $(shell pkg-config JSBSim --cflags)
-	jsbsim.LDFLAGS += $(shell pkg-config JSBSim --libs)
-else
-	JSBSIM_PKG = no
-	jsbsim.CFLAGS  += -I$(JSBSIM_INC)
-	jsbsim.LDFLAGS += -L$(JSBSIM_LIB) -lJSBSim
-endif
-
-
-jsbsim.CFLAGS 		+= $(fbw_CFLAGS) $(ap_CFLAGS)
-jsbsim.srcs 		+= $(fbw_srcs) $(ap_srcs)
-
-jsbsim.CFLAGS 		+= -DSITL -DUSE_JSBSIM
-jsbsim.srcs 		+= $(SIMDIR)/sim_ac_jsbsim.c $(SIMDIR)/sim_ac_fw.c $(SIMDIR)/sim_ac_flightgear.c
-
-# external libraries
-jsbsim.CFLAGS 		+= -I/usr/include $(shell pkg-config glib-2.0 --cflags)
-jsbsim.LDFLAGS		+= $(shell pkg-config glib-2.0 --libs) -lglibivy -lm $(shell pcre-config --libs)
-
-jsbsim.CFLAGS 		+= -DDOWNLINK -DPERIODIC_TELEMETRY -DDOWNLINK_TRANSPORT=IvyTransport
-jsbsim.srcs 		+= subsystems/datalink/downlink.c $(SRC_FIRMWARE)/datalink.c $(SRC_ARCH)/ivy_transport.c
-
-jsbsim.srcs 		+= $(SRC_ARCH)/jsbsim_hw.c $(SRC_ARCH)/jsbsim_ir.c $(SRC_ARCH)/jsbsim_gps.c $(SRC_ARCH)/jsbsim_ahrs.c $(SRC_ARCH)/jsbsim_transport.c
 
 ######################################################################
 ##
@@ -243,9 +219,6 @@ else
   ifeq ($(SEPARATE_FBW),)
     ap.CFLAGS 		+= $(fbw_CFLAGS)
     ap.srcs 		+= $(fbw_srcs)
-  else
-   # avoid fbw_telemetry_mode error
-   ap_srcs		+= $(SRC_FIRMWARE)/fbw_downlink.c
   endif
 endif
 

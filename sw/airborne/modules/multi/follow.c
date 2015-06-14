@@ -30,7 +30,6 @@
 #include "generated/airframe.h"
 
 #include "state.h"
-#include "subsystems/ins/ins_int.h"
 #include "navigation.h"
 #include "messages.h"
 #include "dl_protocol.h"
@@ -47,11 +46,13 @@
 #define FOLLOW_OFFSET_Z 0.0
 #endif
 
-void follow_init( void ) {
+void follow_init(void)
+{
 
 }
 
-void follow_change_wp( unsigned char* buffer ) {
+void follow_change_wp(unsigned char *buffer)
+{
   struct EcefCoor_i new_pos;
   struct EnuCoor_i enu;
   new_pos.x = DL_REMOTE_GPS_ecef_x(buffer);
@@ -59,7 +60,7 @@ void follow_change_wp( unsigned char* buffer ) {
   new_pos.z = DL_REMOTE_GPS_ecef_z(buffer);
 
   // Translate to ENU
-  enu_of_ecef_point_i(&enu, &ins_impl.ltp_def, &new_pos);
+  enu_of_ecef_point_i(&enu, &state.ned_origin_i, &new_pos);
   INT32_VECT3_SCALE_2(enu, enu, INT32_POS_OF_CM_NUM, INT32_POS_OF_CM_DEN);
 
   // TODO: Add the angle to the north
@@ -72,5 +73,5 @@ void follow_change_wp( unsigned char* buffer ) {
   // TODO: Remove the angle to the north
 
   // Move the waypoint
-  INT32_VECT3_COPY(waypoints[FOLLOW_WAYPOINT_ID], enu);
+  VECT3_COPY(waypoints[FOLLOW_WAYPOINT_ID], enu);
 }

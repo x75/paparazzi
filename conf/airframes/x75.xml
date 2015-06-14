@@ -172,20 +172,20 @@
     <!-- <define name="MAG_Z_SENS" value="4.07291719636" integer="16"/> -->
 
     <!-- calibration rothspalk -->
-    <!-- <define name="MAG_X_NEUTRAL" value="4"/> -->
-    <!-- <define name="MAG_Y_NEUTRAL" value="125"/> -->
-    <!-- <define name="MAG_Z_NEUTRAL" value="-1"/> -->
-    <!-- <define name="MAG_X_SENS" value="3.45222037424" integer="16"/> -->
-    <!-- <define name="MAG_Y_SENS" value="3.4215796733" integer="16"/> -->
-    <!-- <define name="MAG_Z_SENS" value="3.80450265396" integer="16"/> -->
+    <define name="MAG_X_NEUTRAL" value="4"/>
+    <define name="MAG_Y_NEUTRAL" value="125"/>
+    <define name="MAG_Z_NEUTRAL" value="-1"/>
+    <define name="MAG_X_SENS" value="3.45222037424" integer="16"/>
+    <define name="MAG_Y_SENS" value="3.4215796733" integer="16"/>
+    <define name="MAG_Z_SENS" value="3.80450265396" integer="16"/>
 
     <!-- calibration mdc -->
-    <define name="MAG_X_NEUTRAL" value="55"/>
-    <define name="MAG_Y_NEUTRAL" value="144"/>
-    <define name="MAG_Z_NEUTRAL" value="-8"/>
-    <define name="MAG_X_SENS" value="3.62696999194" integer="16"/>
-    <define name="MAG_Y_SENS" value="3.64414657283" integer="16"/>
-    <define name="MAG_Z_SENS" value="4.04501382675" integer="16"/>
+    <!-- <define name="MAG_X_NEUTRAL" value="55"/> -->
+    <!-- <define name="MAG_Y_NEUTRAL" value="144"/> -->
+    <!-- <define name="MAG_Z_NEUTRAL" value="-8"/> -->
+    <!-- <define name="MAG_X_SENS" value="3.62696999194" integer="16"/> -->
+    <!-- <define name="MAG_Y_SENS" value="3.64414657283" integer="16"/> -->
+    <!-- <define name="MAG_Z_SENS" value="4.04501382675" integer="16"/> -->
 
 
     <define name="BODY_TO_IMU_PHI"   value="0." unit="deg"/>

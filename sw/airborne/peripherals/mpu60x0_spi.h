@@ -62,6 +62,7 @@ struct Mpu60x0_Spi {
     struct Int16Rates rates;          ///< rates data as angular rates in gyro coordinate system
     int16_t value[3];                 ///< rates data values accessible by channel index
   } data_rates;
+  float temp;                         ///< temperature in degrees Celcius
   uint8_t data_ext[MPU60X0_BUFFER_EXT_LEN];
   struct Mpu60x0Config config;
   enum Mpu60x0SpiSlaveInitStatus slave_init_status;
@@ -74,11 +75,13 @@ extern void mpu60x0_spi_read(struct Mpu60x0_Spi *mpu);
 extern void mpu60x0_spi_event(struct Mpu60x0_Spi *mpu);
 
 /// convenience function: read or start configuration if not already initialized
-static inline void mpu60x0_spi_periodic(struct Mpu60x0_Spi *mpu) {
-  if (mpu->config.initialized)
+static inline void mpu60x0_spi_periodic(struct Mpu60x0_Spi *mpu)
+{
+  if (mpu->config.initialized) {
     mpu60x0_spi_read(mpu);
-  else
+  } else {
     mpu60x0_spi_start_configure(mpu);
+  }
 }
 
 #endif // MPU60X0_SPI_H

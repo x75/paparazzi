@@ -29,12 +29,12 @@
 #define GPS_UBX_UCENTER_H
 
 #include "std.h"
+#include "mcu_periph/link_device.h"
 
 /** U-Center Variables */
-#define GPS_UBX_UCENTER_CONFIG_STEPS	  19
+#define GPS_UBX_UCENTER_CONFIG_STEPS    19
 
-struct gps_ubx_ucenter_struct
-{
+struct gps_ubx_ucenter_struct {
   uint8_t status;
   uint8_t reply;
   uint8_t cnt;
@@ -52,6 +52,9 @@ struct gps_ubx_ucenter_struct
   uint8_t port_id;
 
   char replies[GPS_UBX_UCENTER_CONFIG_STEPS];
+
+  // Gps device
+  struct link_device *dev;
 };
 
 extern struct gps_ubx_ucenter_struct gps_ubx_ucenter;

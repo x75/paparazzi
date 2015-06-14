@@ -18,15 +18,14 @@
     <define name="LOITER_TRIM"/>
 
     <subsystem name="radio_control" type="ppm"/>
-    <subsystem name="joystick"/>
 
     <!-- Communication -->
     <subsystem name="telemetry" 	type="transparent"/>
+    <define name="USE_JOYSTICK" value="TRUE"/>
 
     <!-- Actuators are automatically chosen according to board-->
     <subsystem name="control"/>
     <!-- Sensors -->
-    <subsystem name="ahrs" 		type="infrared"/>
     <subsystem name="gps" 		    type="ublox"/>
 
     <subsystem name="navigation"/>
@@ -35,6 +34,7 @@
 
   <modules>
     <load name="infrared_adc.xml"/>
+    <load name="ahrs_infrared.xml"/>
   </modules>
 
   <firmware name="setup">

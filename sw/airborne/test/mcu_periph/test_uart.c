@@ -25,27 +25,32 @@
 #include "mcu_periph/sys_time.h"
 #include "led.h"
 
-static inline void main_init( void );
-static inline void main_periodic( void );
+static inline void main_init(void);
+static inline void main_periodic(void);
 
-int main(void) {
+int main(void)
+{
 
   main_init();
 
   while (1) {
-    if (sys_time_check_and_ack_timer(0))
+    if (sys_time_check_and_ack_timer(0)) {
       main_periodic();
+    }
+    uart_event();
   }
 
   return 0;
 }
 
-static inline void main_init( void ) {
+static inline void main_init(void)
+{
   mcu_init();
-  sys_time_register_timer((1./PERIODIC_FREQUENCY), NULL);
+  sys_time_register_timer((1. / PERIODIC_FREQUENCY), NULL);
 }
 
-static inline void main_periodic( void ) {
+static inline void main_periodic(void)
+{
   char ch;
 
 #if USE_UART1
@@ -57,8 +62,11 @@ static inline void main_periodic( void ) {
 #if USE_UART3
   uart_transmit(&uart3, 'c');
 #endif
+#if USE_UART4
+  uart_transmit(&uart4, 'd');
+#endif
 #if USE_UART5
-  uart_transmit(&uart5, 'd');
+  uart_transmit(&uart5, 'e');
 #endif
 
   LED_OFF(1);
@@ -97,10 +105,21 @@ static inline void main_periodic( void ) {
   }
 #endif
 
+#if USE_UART4
+  if (uart_char_available(&uart4)) {
+    ch =  uart_getch(&uart4);
+    if (ch == 'd') {
+      LED_ON(1);
+    } else {
+      LED_ON(2);
+    }
+  }
+#endif
+
 #if USE_UART5
   if (uart_char_available(&uart5)) {
     ch =  uart_getch(&uart5);
-    if (ch == 'd') {
+    if (ch == 'e') {
       LED_ON(1);
     } else {
       LED_ON(2);

@@ -32,7 +32,7 @@
 
 #if MODULE_HMC58XX_UPDATE_AHRS
 #include "subsystems/imu.h"
-#include "subsystems/ahrs.h"
+#include "subsystems/abi.h"
 
 #ifndef HMC58XX_CHAN_X
 #define HMC58XX_CHAN_X 0
@@ -48,18 +48,25 @@
 
 struct Hmc58xx mag_hmc58xx;
 
-void mag_hmc58xx_module_init(void) {
+void mag_hmc58xx_module_init(void)
+{
   hmc58xx_init(&mag_hmc58xx, &(MAG_HMC58XX_I2C_DEV), HMC58XX_ADDR);
 }
 
-void mag_hmc58xx_module_periodic(void) {
+void mag_hmc58xx_module_periodic(void)
+{
   hmc58xx_periodic(&mag_hmc58xx);
 }
 
-void mag_hmc58xx_module_event(void) {
+void mag_hmc58xx_module_event(void)
+{
   hmc58xx_event(&mag_hmc58xx);
-#if MODULE_HMC58XX_UPDATE_AHRS
+
   if (mag_hmc58xx.data_available) {
+#if MODULE_HMC58XX_UPDATE_AHRS
+    // current timestamp
+    uint32_t now_ts = get_sys_time_usec();
+
     // set channel order
     struct Int32Vect3 mag = {
       (int32_t)(mag_hmc58xx.data.value[HMC58XX_CHAN_X]),
@@ -69,23 +76,21 @@ void mag_hmc58xx_module_event(void) {
     // unscaled vector
     VECT3_COPY(imu.mag_unscaled, mag);
     // scale vector
-    ImuScaleMag(imu);
-    // update ahrs
-    if (ahrs.status == AHRS_RUNNING) {
-      ahrs_update_mag();
-    }
-    mag_hmc58xx.data_available = FALSE;
-  }
+    imu_scale_mag(&imu);
+
+    AbiSendMsgIMU_MAG_INT32(MAG_HMC58XX_SENDER_ID, now_ts, &imu.mag);
 #endif
 #if MODULE_HMC58XX_SYNC_SEND
-  if (mag_hmc58xx.data_available) {
     mag_hmc58xx_report();
-    mag_hmc58xx.data_available = FALSE;
-  }
 #endif
+#if MODULE_HMC58XX_UPDATE_AHRS ||  MODULE_HMC58XX_SYNC_SEND
+    mag_hmc58xx.data_available = FALSE;
+#endif
+  }
 }
 
-void mag_hmc58xx_report(void) {
+void mag_hmc58xx_report(void)
+{
   struct Int32Vect3 mag = {
     (int32_t)(mag_hmc58xx.data.vect.x),
     (int32_t)(mag_hmc58xx.data.vect.y),
