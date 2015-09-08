@@ -14,10 +14,12 @@ from settings_tool import IvySettingsInterface
 from pprz_msg.message import PprzMessage
 
 from ivy.ivy import IvyServer
+
+import numpy as np
     
 # class MyAgent(IvyServer):
 class MyAgent(object):
-    def __init__(self, name, msg_class = "telemetry"):
+    def __init__(self, name, ac_id, msg_class = "telemetry"):
         # IvyServer.__init__(self,'MyAgent')
         # self.name = name
         # self.start('127.255.255.255:2010')
@@ -26,6 +28,8 @@ class MyAgent(object):
 
         # install interrupt handler
         signal.signal(signal.SIGINT, self.shutdown_handler)
+
+        self.ac_id = [ac_id]
         
         self.msg_class = msg_class
         self.interface = 0
@@ -41,8 +45,12 @@ class MyAgent(object):
         
     def start_settings(self):
         print("starting ivy (settings) ...")
-        self.settings_if = IvySettingsInterface([167])
-        print("done starting ivy (settings) ...")
+        self.settings_if = IvySettingsInterface(self.ac_id)
+        print("done starting ivy (settings) for AC %s" % self.settings_if.GetACName())
+        for group in self.settings_if.groups:
+            print("Setting group %s" % group.name)
+            for setting in group.member_list:
+                print("%s (%d)" % (setting.shortname, setting.index))
         
     def shutdown_handler(self, signum, frame):
         print('Signal handler called with signal', signum)
@@ -70,8 +78,11 @@ class MyAgent(object):
         # return
         # print("ac_id", ac_id)
         if msg.msg_class == "telemetry":
-            # print("msg", msg)
-            pass
+            # print("msg", dir(msg))
+            print("msg", msg.name)
+            print("msg", msg.fieldnames)
+            print("msg", msg.fieldvalues)
+            # pass
             
     
 def main(args):
@@ -85,7 +96,7 @@ def main(args):
 
     # a = 
     
-    a = MyAgent("agent")
+    a = MyAgent("agent", int(args.ac_id))
 
     print("agent created")
     
@@ -103,11 +114,16 @@ def main(args):
     
     while True:
         print("blub")
+        # print("Setting Att Loop pgain phi(%d) = %f" % (38, a.settings_if.lookup[38].value))
+        # for i 
+        print(a.settings_if.lookup[38].value)
+        a.settings_if.lookup[38].value = 850 + np.random.randint(10)
+        a.settings_if.SendSetting(38)
         time.sleep(1.)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-a", "--ac_id", dest="ac_id", default=[167])
+    parser.add_argument("-a", "--ac_id", dest="ac_id", default=167)
     
     args = parser.parse_args()
     main(args)
