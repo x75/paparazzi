@@ -368,6 +368,7 @@ void ahrs_icq_update_accel(struct Int32Vect3 *accel, float dt)
 
 void ahrs_icq_update_mag(struct Int32Vect3 *mag, float dt)
 {
+#if USE_MAGNETOMETER
   // check if we had at least one propagation since last update
   if (ahrs_icq.mag_cnt == 0) {
     return;
@@ -379,6 +380,7 @@ void ahrs_icq_update_mag(struct Int32Vect3 *mag, float dt)
 #endif
   // reset mag propagation counter
   ahrs_icq.mag_cnt = 0;
+#endif
 }
 
 void ahrs_icq_set_mag_gains(void)
@@ -651,7 +653,6 @@ void ahrs_icq_set_body_to_imu_quat(struct FloatQuat *q_b2i)
 
   if (!ahrs_icq.is_aligned) {
     /* Set ltp_to_imu so that body is zero */
-    memcpy(&ahrs_icq.ltp_to_imu_quat, orientationGetQuat_i(&ahrs_icq.body_to_imu),
-           sizeof(struct Int32Quat));
+    ahrs_icq.ltp_to_imu_quat = *orientationGetQuat_i(&ahrs_icq.body_to_imu);
   }
 }
