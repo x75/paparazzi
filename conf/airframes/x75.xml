@@ -179,6 +179,15 @@
     <define name="MAG_Y_SENS" value="3.4215796733" integer="16"/>
     <define name="MAG_Z_SENS" value="3.80450265396" integer="16"/>
 
+<!-- where is this? -->
+<!-- <define name="MAG_X_NEUTRAL" value="-295"/> -->
+<!-- <define name="MAG_Y_NEUTRAL" value="-196"/> -->
+<!-- <define name="MAG_Z_NEUTRAL" value="-166"/> -->
+<!-- <define name="MAG_X_SENS" value="3.27376708931" integer="16"/> -->
+<!-- <define name="MAG_Y_SENS" value="3.25784552567" integer="16"/> -->
+<!-- <define name="MAG_Z_SENS" value="3.68005074955" integer="16"/> -->
+
+
     <!-- calibration mdc -->
     <!-- <define name="MAG_X_NEUTRAL" value="55"/> -->
     <!-- <define name="MAG_Y_NEUTRAL" value="144"/> -->

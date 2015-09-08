@@ -27,6 +27,7 @@ class IvyMessagesInterface(object):
 
     def shutdown(self):
         self.stop()
+        # IvyUnBindMsg(self.ivy_id)
         IvyStop()
 
     def __init__del__(self):

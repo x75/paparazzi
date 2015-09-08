@@ -32,7 +32,7 @@ class IvySettingsInterface(PaparazziACSettings):
         setting_value = message_values[2]
 
         if _SHOW_IVY_MSGS_:
-            print("Got setting with index: %s   value %s   " % (setting_index, setting_value))
+            print("Got setting with index: %s   value %s, fromRemote: %d   " % (setting_index, setting_value, fromRemote))
 
         # Store value from message
         self.lookup[setting_index].value = setting_value
