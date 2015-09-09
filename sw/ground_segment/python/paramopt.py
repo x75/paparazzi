@@ -16,9 +16,11 @@ from pprz_msg.message import PprzMessage
 from ivy.ivy import IvyServer
 
 import numpy as np
+import pylab as pl
     
 # class MyAgent(IvyServer):
 class MyAgent(object):
+    """Parameter optimizing agent for Paparazzi system"""
     def __init__(self, name, ac_id, msg_class = "telemetry"):
         # IvyServer.__init__(self,'MyAgent')
         # self.name = name
@@ -29,13 +31,25 @@ class MyAgent(object):
         # install interrupt handler
         signal.signal(signal.SIGINT, self.shutdown_handler)
 
+        # aircraft ID
         self.ac_id = [ac_id]
-        
+
+        # message class for filtering
         self.msg_class = msg_class
-        self.interface = 0
+        # settings interface, this one does the  Ivy init
         self.settings_if = 0
+        # message interface, so this one doesn't need to do it, see below
+        self.interface = 0
+        
         # self.timer = threading.Timer(0.1, self.update_leds)
         # self.timer.start()
+
+        # data collection etc
+        self.cnt_eval = 0 # count number of evaluations of cost
+        self.cnt_time = 0
+        self.maxsamp = 100
+        self.numdata = 3 * 2 # sp, ref, measurement * 2 for attitude + batt, mode
+        self.logdata = np.zeros((self.maxsamp, self.numdata))
 
     def start(self):
         print("starting ivy ...")
@@ -82,7 +96,27 @@ class MyAgent(object):
             print("msg", msg.name)
             print("msg", msg.fieldnames)
             print("msg", msg.fieldvalues)
+            print("msg", msg.fieldcoefs)
             # pass
+
+        print(type(msg.fieldvalues[0]))
+
+        if msg.name == "STAB_ATTITUDE_INT":
+            self.logdata[self.cnt_time,2] = float(msg.fieldvalues[3]) * msg.fieldcoefs[3] # est_phi
+            self.logdata[self.cnt_time,5] = float(msg.fieldvalues[4]) * msg.fieldcoefs[4] # est_theta
+            self.cnt_time += 1
+        elif msg.name == "STAB_ATTITUDE_REF_INT":
+            self.logdata[self.cnt_time,0] = float(msg.fieldvalues[0]) * msg.fieldcoefs[0] # sp_phi
+            self.logdata[self.cnt_time,1] = float(msg.fieldvalues[3]) * msg.fieldcoefs[3] # ref_phi
+            self.logdata[self.cnt_time,3] = float(msg.fieldvalues[1]) * msg.fieldcoefs[1] # sp_theta
+            self.logdata[self.cnt_time,4] = float(msg.fieldvalues[4]) * msg.fieldcoefs[4] # ref_theta
+        if self.cnt_time == self.maxsamp:
+            pl.plot(self.logdata)
+            pl.show()
+            self.shutdown_handler(15, "")
+            
+    def objective(self, params):
+        print(objective)
             
     
 def main(args):
