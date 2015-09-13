@@ -17,6 +17,9 @@ from ivy.ivy import IvyServer
 
 import numpy as np
 import pylab as pl
+import tables as tb
+
+from paramopt_data import PPRZ_Opt_Attitude
     
 # class MyAgent(IvyServer):
 class MyAgent(object):
@@ -53,6 +56,23 @@ class MyAgent(object):
         self.maxsamp = 100
         self.numdata = 3 * 2 # sp, ref, measurement * 2 for attitude + batt, mode
         self.logdata = np.zeros((self.maxsamp, self.numdata))
+
+        # data storage
+        self.storage_version = "v2"
+        self.tblfilename = "paramopt_ppz_v1.h5"
+        self.h5file = tb.open_file(self.tblfilename, mode = "a")
+        # check if top group exists
+        try:
+            self.g1    = self.h5file.get_node("/%s" % self.storage_version)
+            # self.table = self.h5file.list_nodes("/v1")[0]
+            self.table = self.h5file.get_node("/%s/evaluations" % self.storage_version)
+        except:
+            self.g1     = self.h5file.create_group(self.h5file.root, self.storage_version,
+                                               "Optimization run params, perf and logdata")
+            if self.storage_version == "v2":
+                self.table = self.h5file.create_table(self.g1, 'evaluations', PPRZ_Opt_Attitude, "Single optimizer evaluations")
+        print(self.g1, self.table)
+        self.pprz_opt_attitude = self.table.row
 
     def start(self):
         print("starting ivy ...")
@@ -123,18 +143,12 @@ class MyAgent(object):
         if self.cnt_time == self.maxsamp:
             # compute something
             self.active = False
-            self.cnt_time = 0
-            pl.cla()
-            pl.plot(self.logdata)
-            
-            pl.show()
-            pl.draw()
-            
+            self.cnt_time = 0            
             # self.shutdown_handler(15, "")
             
     def objective(self, params):
         # suggest new setting
-        self.settings_if.lookup[38].value = 850 + np.random.randint(10)
+        self.settings_if.lookup[38].value = params[0] # 850 + np.random.randint(10)
         # send setting to autopilot
         self.settings_if.SendSetting(38)
         # tell agent about new setting
@@ -144,8 +158,36 @@ class MyAgent(object):
         # print(objective)
         while self.active:
             time.sleep(1.)
+        cost = np.mean(np.square(self.logdata[:,1] - self.logdata[:,2]))
+
+        # save data to pytable
+        ts = time.strftime("%Y%m%d%H%M%S")
+        self.pprz_opt_attitude["id"] = int(ts)
+        self.pprz_opt_attitude["pgain_phi"]   = params[0]
+        self.pprz_opt_attitude["dgain_p"]     = params[1]
+        self.pprz_opt_attitude["igain_phi"]   = params[2]
+        self.pprz_opt_attitude["ddgain_p"]    = params[3]
+        self.pprz_opt_attitude["pgain_theta"] = params[4]
+        self.pprz_opt_attitude["dgain_q"]     = params[5]
+        self.pprz_opt_attitude["igain_theta"] = params[6]
+        self.pprz_opt_attitude["ddgain_q"]    = params[7]
+        # set run performance measure
+        self.pprz_opt_attitude["mse"]         = cost
+        # set run logdata
+        # self.pprz_opt_attitude["timeseries"][0:self.maxsamp]  = self.logdata
+        self.pprz_opt_attitude["timeseries"]  = self.logdata
+        # append new row
+        self.pprz_opt_attitude.append()
+        self.table.flush()
+
+        
         # print evaluation result
-        print("cost %f" % np.mean(np.square(self.logdata[:,1] - self.logdata[:,2])))
+        pl.cla()
+        pl.plot(self.logdata)
+            
+        pl.show()
+        pl.draw()
+        return cost
     
 def main(args):
     print("main:", args)
@@ -183,14 +225,20 @@ def main(args):
     a.settings_if.lookup[0].value = 7
     # send setting to autopilot
     a.settings_if.SendSetting(0)
+
+    
     
     while True:
         print("Starting episode")
         # print("Setting Att Loop pgain phi(%d) = %f" % (38, a.settings_if.lookup[38].value))
-        # for i 
-        print("settings (read):", a.settings_if.lookup[38].value)
-        a.objective({})
+        # read current settings
+        # for i in range(29, 38):
+        #     print("settings.lookup[%d] (read) = %f" % (i, a.settings_if.lookup[i].value))
+        params = (290 + np.random.randint(20), 0, 0, 0, 0, 0, 0, 0)
+        cost = a.objective(params)
+        print("cost %f" % cost)
         time.sleep(5.)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
