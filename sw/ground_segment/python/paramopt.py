@@ -10,7 +10,7 @@ sys.path.append(os.getenv("PAPARAZZI_HOME") + "/sw/lib/python")
 
 from settings_tool import IvySettingsInterface
 from ivy_msg_interface import IvyMessagesInterface
-from settings_tool import IvySettingsInterface
+# from settings_tool import IvySettingsInterface
 from pprz_msg.message import PprzMessage
 
 from ivy.ivy import IvyServer
@@ -56,6 +56,19 @@ class MyAgent(object):
         self.maxsamp = 100
         self.numdata = 3 * 2 # sp, ref, measurement * 2 for attitude + batt, mode
         self.logdata = np.zeros((self.maxsamp, self.numdata))
+
+        # backup parameters
+        self.default_params = (
+            300, # pgain_phi
+            350, # dgain p
+            100, # igain_phi
+            150, # ddgain_p
+            300, # pgain_theta
+            350, # dgain q
+            100, # igain_theta
+            150 # ddgain_q
+            )
+        print("default_params:", self.default_params)
 
         # data storage
         self.storage_version = "v2"
@@ -119,11 +132,12 @@ class MyAgent(object):
 
         if msg.msg_class == "telemetry":
             # print("msg", dir(msg))
-            print("msg", msg.name)
-            print("msg", msg.fieldnames)
-            print("msg", msg.fieldvalues)
-            print("msg", msg.fieldcoefs)
-            # pass
+            # print("msg", msg.name)
+            # print("msg", zip(msg.fieldnames, msg.fieldvalues))
+            # print("msg", msg.fieldcoefs)
+            pass
+        else:
+            return
 
         # print(type(msg.fieldvalues[0]))
 
@@ -138,15 +152,35 @@ class MyAgent(object):
             self.logdata[self.cnt_time,1] = float(msg.fieldvalues[3]) * msg.fieldcoefs[3] # ref_phi
             self.logdata[self.cnt_time,3] = float(msg.fieldvalues[1]) * msg.fieldcoefs[1] # sp_theta
             self.logdata[self.cnt_time,4] = float(msg.fieldvalues[4]) * msg.fieldcoefs[4] # ref_theta
+        elif msg.name == "ROTORCRAFT_STATUS":
+            print("STATUS")
+        elif msg.name == "RC":
+            # print("RC")
+            rc_vals = msg.fieldvalues[0].split(",")
+            print("RC", rc_vals)
+            if int(rc_vals[4]) > 1000:
+                self.reset_params()
+                self.active = False
+                # self.cnt_time = 0
 
         # finish episode
         if self.cnt_time == self.maxsamp:
             # compute something
             self.active = False
-            self.cnt_time = 0            
+            # self.cnt_time = 0
             # self.shutdown_handler(15, "")
+
+    def reset_params(self):
+        print("reset")
             
     def objective(self, params):
+        # 29, 30, 31, 32, 33, 34, 35, 36
+        # reset counter
+        self.cnt_time = 0
+        # reet logdata
+        self.logdata[:,:] = 0.
+        # play sound
+        
         # suggest new setting
         self.settings_if.lookup[38].value = params[0] # 850 + np.random.randint(10)
         # send setting to autopilot
@@ -158,7 +192,15 @@ class MyAgent(object):
         # print(objective)
         while self.active:
             time.sleep(1.)
-        cost = np.mean(np.square(self.logdata[:,1] - self.logdata[:,2]))
+
+        # compute cost
+        # premature termination gives max cost
+        if self.cnt_time != self.maxsamp:
+            print("premature")
+            cost = 1e4
+        else:
+            # compute cost: mean squared error of ref and est
+            cost = np.mean(np.square(self.logdata[:,1] - self.logdata[:,2]))
 
         # save data to pytable
         ts = time.strftime("%Y%m%d%H%M%S")
@@ -180,7 +222,6 @@ class MyAgent(object):
         self.pprz_opt_attitude.append()
         self.table.flush()
 
-        
         # print evaluation result
         pl.cla()
         pl.plot(self.logdata)
@@ -222,7 +263,8 @@ def main(args):
     # print ("sent")
 
     # set telemetry mode to attitude loop
-    a.settings_if.lookup[0].value = 7
+    # a.settings_if.lookup[0].value = 7  # attitude_loop
+    a.settings_if.lookup[0].value = 14 # attitude_tune_x75
     # send setting to autopilot
     a.settings_if.SendSetting(0)
 
@@ -237,7 +279,9 @@ def main(args):
         params = (290 + np.random.randint(20), 0, 0, 0, 0, 0, 0, 0)
         cost = a.objective(params)
         print("cost %f" % cost)
+        # a.interface.stop()
         time.sleep(5.)
+        # a.interface.start()
 
 
 if __name__ == "__main__":

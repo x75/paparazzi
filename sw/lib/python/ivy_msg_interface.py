@@ -22,6 +22,10 @@ class IvyMessagesInterface(object):
         self.verbose = verbose
         self.init_ivy(init, bind_regex)
 
+    def start(self):
+        bind_regex='(.*)'        
+        self.ivy_id = IvyBindMsg(self.on_ivy_msg, bind_regex)
+
     def stop(self):
         IvyUnBindMsg(self.ivy_id)
 

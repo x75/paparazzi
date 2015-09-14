@@ -15,6 +15,7 @@
       <configure name="LISA_M_BARO" value="BARO_MS5611_SPI"/>
       <subsystem name="radio_control" type="spektrum">
         <define name="RADIO_MODE" value="RADIO_AUX1"/>
+        <!-- <define name="RADIO_AUTO_MODE" value="RADIO_AUX2"/> -->
       <!-- <define name="RADIO_KILL_SWITCH" value="RADIO_FLAPS"/> -->
       <!-- <define name="USE_KILL_SWITCH_FOR_MOTOR_ARMING" value="1"/> -->
 

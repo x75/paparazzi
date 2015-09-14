@@ -12,7 +12,7 @@ PPRZ_SRC = os.getenv("PAPARAZZI_SRC", os.path.normpath(os.path.join(os.path.dirn
 sys.path.append(PPRZ_SRC + "/sw/lib/python")
 from settings_xml_parse import PaparazziACSettings
 
-_SHOW_IVY_MSGS_ = True
+_SHOW_IVY_MSGS_ = False
 
 class IvySettingsInterface(PaparazziACSettings):
     def __init__(self, ac_ids):
