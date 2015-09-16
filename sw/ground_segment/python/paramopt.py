@@ -101,11 +101,23 @@ class MyAgent(object):
     def start_settings(self):
         print("starting ivy (settings) ...")
         self.settings_if = IvySettingsInterface(self.ac_id)
+        self.settings_if.RegisterCallback(self.settings_update_cb)
         print("done starting ivy (settings) for AC %s" % self.settings_if.GetACName())
         for group in self.settings_if.groups:
             print("Setting group %s" % group.name)
             for setting in group.member_list:
                 print("%s (%d)" % (setting.shortname, setting.index))
+
+    def settings_update_cb(self, sidx, sval, frem):
+        # print("settings_update_cb", sidx, sval, frem)
+        # pass
+        if self.safety:
+            fsval = float(sval)
+            isval = int(fsval)
+            if sidx in self.param_idx:
+                if isval != self.default_params[sidx-29]:
+                    print("FAIL", sidx, isval, self.default_params[sidx-29])
+                    self.reset_params()
         
     def shutdown_handler(self, signum, frame):
         print('Signal handler called with signal', signum)
@@ -156,8 +168,8 @@ class MyAgent(object):
                 if not self.safety:
                     self.safety = True
                     self.reset_params()
-                    time.sleep(0.5)
-                    self.reset_params()
+                    # time.sleep(0.5)
+                    # self.reset_params()
                 # self.cnt_time = 0
             elif int(rc_vals[4]) < -1000:
                 self.safety = False
@@ -190,11 +202,21 @@ class MyAgent(object):
     def reset_params(self):
         print("reset")
         for idx in self.param_idx:
-            if self.settings_if.lookup[idx].value == self.default_params[idx - self.param_idx[0]]:
-                print("SAME")
-            self.settings_if.lookup[idx].value = self.default_params[idx - self.param_idx[0]] # 850 + np.random.randint(10)
-            self.settings_if.SendSetting(idx)
-            print("params[%d] = %d" % (idx, self.settings_if.lookup[idx].value))
+            r_idx = idx - self.param_idx[0]
+            while self.settings_if.lookup[idx].value != self.default_params[r_idx]:
+                # print("UNSAME")
+                self.settings_if.lookup[idx].value = int(self.default_params[r_idx]) # 850 + np.random.randint(10)
+                self.settings_if.SendSetting(idx)
+
+
+        # time.sleep(0.1)
+        # # check
+        # for idx in self.param_idx:
+        #     r_idx = idx - self.param_idx[0]
+        #     if self.settings_if.lookup[idx].value != self.default_params[r_idx]:
+        #         self.settings_if.lookup[idx].value = self.default_params[r_idx]
+        #         self.settings_if.SendSetting(idx)
+        #         print("UNSAME: params[%d] = %d" % (idx, self.settings_if.lookup[idx].value))        
             
     def objective(self, params):
         print("params:", params)
@@ -230,7 +252,9 @@ class MyAgent(object):
             for idx in self.param_idx:
                 r_idx = idx - self.param_idx[0]
                 # print("r_idx = %d" % r_idx)
-                print(self.settings_if.lookup[idx].value)
+                # print(self.settings_if.lookup[idx].value, )
+                sys.stdout.write("%s, " % self.settings_if.lookup[idx].value)
+            sys.stdout.write("\n")
             
         # compute cost
         # premature termination gives max cost
