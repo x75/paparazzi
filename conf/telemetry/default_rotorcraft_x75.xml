@@ -142,6 +142,19 @@
       <message name="IMU_MAG_CURRENT_CALIBRATION"   period="0.05"/>
     </mode>
 
+    <mode name="attitude_tune_x75">
+      <message name="ROTORCRAFT_STATUS" period="1.2"/>
+      <message name="DL_VALUE"          period="0.5"/>
+      <message name="ALIVE"             period="0.9"/>
+      <message name="STAB_ATTITUDE"     period=".03"/>
+      <message name="STAB_ATTITUDE_REF" period=".03"/>
+      <!-- get commands -->
+      <!-- <message name="PPM"                      period="0.5"/> -->
+      <message name="RC"                       period="0.1"/>
+      <message name="ROTORCRAFT_RADIO_CONTROL" period="0.5"/>
+      <message name="ROTORCRAFT_CMD"           period=".05"/>
+    </mode>
+
   </process>
 
 </telemetry>
