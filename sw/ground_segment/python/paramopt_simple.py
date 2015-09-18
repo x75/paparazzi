@@ -3,6 +3,7 @@
 
 from __future__ import print_function
 
+import argparse
 from functools import partial
 import numpy as np
 import pylab as pl
@@ -29,38 +30,59 @@ def objective(params):
     return myfunc(params["x"], params["y"])
 
 if __name__ == "__main__":
-    print("main")
-    
-    t1 = np.linspace(0, 1.5 * np.pi, 101)
-    t2 = np.linspace(0, 3.7 * np.pi, 101)
-    T = np.meshgrid(t1, t2)
-    # fig = pl.figure()
-    # ax = fig.gca(projection="3d")
-    R = myfunc(T[0], T[1])
-    print("argmin", np.argmin(R), R.shape)
-    print("min", np.min(R), R.shape)
-    # surf = ax.plot_surface(T[0], T[1], R)
-    # pl.show()
+    # print("main")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-m", "--mode", default="rand")
+    parser.add_argument("-p", "--plot", action="store_true")
 
+    args = parser.parse_args()
     
+    t1 = np.linspace(-1., 1.5 * np.pi, 101)
+    t2 = np.linspace(-1., 3.7 * np.pi, 101)
+    T = np.meshgrid(t1, t2)
+    R = myfunc(T[0], T[1])
+    R_argmin = np.argmin(R)
+    print("argmin", R_argmin, R[R_argmin], R.shape)
+    print("min", np.min(R), R.shape)
+
+    if args.plot:
+        fig = pl.figure()
+        ax = fig.gca(projection="3d")
+        surf = ax.plot_surface(T[0], T[1], R)
+        pl.show()
+
     space = {
-        "x": hp.uniform("x", 0, 1.5 * np.pi),
-        "y": hp.uniform("y", 0, 3.7 * np.pi)
+        "x": hp.uniform("x", -1., 1.5 * np.pi),
+        "y": hp.uniform("y", -1., 3.7 * np.pi)
         }
 
     # print(dir(hp_gpsmbo.hpsuggest))
-    suggest_ucb = suggest_algos.ucb
-    suggest_ei = suggest_algos.ei
-    suggest_tpe = tpe.suggest
-    suggest_rand = rand.suggest
-    suggest = partial(suggest_ei, stop_at=0.2),
+    if args.mode == "gp_ucb":
+        # suggest_ucb = 
+        suggest = partial(suggest_algos.ucb, stop_at=1.),
+        # print("suggest", suggest, type(suggest))
+        suggest = suggest[0]
+    elif args.mode == "gp_ei":
+        suggest = partial(suggest_algos.ei, stop_at=1.),
+        suggest = suggest[0]
+    elif args.mode == "tpe":
+        suggest = tpe.suggest
+    else:
+        suggest = rand.suggest
+
+    # final suggest
+    # suggest = partial(suggest_ei, stop_at=5.),
+    
     trials = Trials()
+
+    # print("types", type(objective), type(trials), type(suggest), suggest, type(np.random.RandomState(1)))
+    
     best = fmin(fn=objective,
                 space=space,
                 trials=trials,
-                # algo=partial(suggest, stop_at=-1.2),
-                algo=
+                # algo=partial(suggest_algos.ei, stop_at=-1.2),
+                algo=suggest,
                 rstate=np.random.RandomState(1),
-                max_evals=100)
+                max_evals=1000)
 
     print("best", best)
