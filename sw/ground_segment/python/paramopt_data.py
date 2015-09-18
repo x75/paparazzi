@@ -14,7 +14,7 @@ class PPRZ_Opt_Attitude(tb.IsDescription):
     igain_theta = tb.Int32Col()
     ddgain_q    = tb.Int32Col()
     mse        = tb.Float32Col()
-    timeseries = tb.Float32Col(shape=(100, 12))
+    timeseries = tb.Float32Col(shape=(500, 12))
 
 if __name__ == "__main__":
     print("class definition file only")

@@ -59,7 +59,7 @@ if __name__ == "__main__":
                 space=space,
                 trials=trials,
                 # algo=partial(suggest, stop_at=-1.2),
-                algo=
+                algo=suggest,
                 rstate=np.random.RandomState(1),
                 max_evals=100)
 

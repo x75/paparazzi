@@ -56,12 +56,17 @@ class MyAgent(object):
         self.cnt_eval = 0 # count number of evaluations of cost
         self.cnt_time = 0
         self.cnt_setting = 0
-        self.maxsamp = 100
+        self.maxsamp = 500
         self.numdata = 3 * 2 + 6 # sp, ref, measurement * 2 for attitude + 6 RC channels
         self.logdata = np.zeros((self.maxsamp, self.numdata))
 
         # parameters optimized
-        self.param_idx = [29, 30, 31, 32, 33, 34, 35, 36]
+        if self.ac_id[0] == 167:
+            # self.param_idx = [29, 30, 31, 32, 33, 34, 35, 36]
+            self.param_idx = range(29, 37)
+        elif self.ac_id[0] == 201:
+            self.param_idx = range(38, 46)
+        print("param indices", self.param_idx)
         # backup parameters
         self.default_params = (
             300, # pgain_phi
@@ -74,6 +79,10 @@ class MyAgent(object):
             150 # ddgain_q
             )
         print("default_params:", self.default_params)
+        # self.onboard_params = (-1, -1, -1, -1, -1, -1, -1, -1)
+        self.onboard_params = [-1, -1, -1, -1, -1, -1, -1, -1]
+        self.desired_params = self.default_params
+        self.params_eq = False
 
         # data storage
         self.storage_version = "v2"
@@ -110,14 +119,14 @@ class MyAgent(object):
 
     def settings_update_cb(self, sidx, sval, frem):
         # print("settings_update_cb", sidx, sval, frem)
-        # pass
-        if self.safety:
-            fsval = float(sval)
-            isval = int(fsval)
-            if sidx in self.param_idx:
-                if isval != self.default_params[sidx-29]:
-                    print("FAIL", sidx, isval, self.default_params[sidx-29])
-                    self.reset_params()
+        pass
+        # if self.safety:
+        #     fsval = float(sval)
+        #     isval = int(fsval)
+        #     if sidx in self.param_idx:
+        #         if isval != self.default_params[sidx-29]:
+        #             print("FAIL", sidx, isval, self.default_params[sidx-29])
+        #             self.reset_params()
         
     def shutdown_handler(self, signum, frame):
         print('Signal handler called with signal', signum)
@@ -144,6 +153,22 @@ class MyAgent(object):
         # if time.time() - self.aircrafts[ac_id].messages[msg.name].last_seen < 0.2:
         # return
         # print("ac_id", ac_id)
+        # if msg.name.startswith("DL_VALUE"):
+        if msg.name ==  "DL_VALUES":
+            # print(msg.name, msg.fieldvalues[1])
+            # sys.stdout.write("DL_VALUES ")
+            for idx in self.param_idx:
+                r_idx = idx - self.param_idx[0]
+                # print("msg", msg.fieldvalues[1])
+                dl_values = msg.fieldvalues[1].split(",")
+                # sys.stdout.write("'%s', " % (dl_values[idx]))
+                if dl_values[idx] != '?':
+                    self.onboard_params[r_idx] = float(dl_values[idx])
+                else:
+                    self.onboard_params[r_idx] = -1.
+            # sys.stdout.write("\n")
+                    
+        # return
         
         if msg.msg_class == "telemetry":
             # print("msg", dir(msg))
@@ -160,9 +185,10 @@ class MyAgent(object):
         if msg.name == "RC":
             # print("RC")
             rc_vals = msg.fieldvalues[0].split(",")
-            if self.cnt_time < self.maxsamp:
-                self.logdata[self.cnt_time,6:12] = rc_vals[0:6]
+            rc_vals_len = min(len(rc_vals), 6)
             # print("RC", len(rc_vals), rc_vals)
+            if self.cnt_time < self.maxsamp:
+                self.logdata[self.cnt_time,6:6+rc_vals_len] = rc_vals[0:rc_vals_len]
             if int(rc_vals[4]) > 1000:
                 self.active = False
                 if not self.safety:
@@ -199,14 +225,53 @@ class MyAgent(object):
             # self.cnt_time = 0
             # self.shutdown_handler(15, "")
 
-    def reset_params(self):
-        print("reset")
+    def set_param(self, idx, val):
+        self.settings_if.lookup[idx].value = str(val)
+        self.settings_if.SendSetting(idx)
+        # for i in range(10):
+        #     print("val check", val, self.settings_if.lookup[idx].value)
+        #     time.sleep(0.2)
+
+    def set_params(self, params):
+        self.params_eq = False
+        # for idx in self.param_idx:
+        #     r_idx = idx - self.param_idx[0]
+        #     self.set_param(idx, params[r_idx])
+
+        while not self.params_eq:
+            print("set_params", self.params_eq)
+            for idx in self.param_idx:
+                r_idx = idx - self.param_idx[0]
+                self.set_param(idx, params[r_idx])
+                print(idx, params)
+                print("params[%d]: %f == %f?" % (idx, self.settings_if.lookup[idx].value, self.onboard_params[r_idx]))
+                print()
+                # if self.settings_if.lookup[idx].value == params[r_idx]:
+                if self.settings_if.lookup[idx].value == self.onboard_params[r_idx]:
+                    print("################################################################################")
+                    self.params_eq = True
+                else:
+                    self.params_eq = False
+            time.sleep(0.1)
+
+    def set_params_cont(self):
         for idx in self.param_idx:
             r_idx = idx - self.param_idx[0]
-            while self.settings_if.lookup[idx].value != self.default_params[r_idx]:
-                # print("UNSAME")
-                self.settings_if.lookup[idx].value = int(self.default_params[r_idx]) # 850 + np.random.randint(10)
-                self.settings_if.SendSetting(idx)
+            self.set_param(idx, self.desired_params[r_idx])
+            # time.sleep(0.05)
+                        
+    def reset_params(self):
+        print("reset")
+        # self.set_params(self.default_params)
+        self.desired_params = self.default_params
+        
+        # for idx in self.param_idx:
+        #     r_idx = idx - self.param_idx[0]
+        #     while self.settings_if.lookup[idx].value != self.default_params[r_idx]:
+        #         self.set_param(idx, int(self.default_params[r_idx]))
+        #         # print("UNSAME")
+        #         # self.settings_if.lookup[idx].value = int(self.default_params[r_idx]) # 850 + np.random.randint(10)
+        #         # self.settings_if.SendSetting(idx)
 
 
         # time.sleep(0.1)
@@ -217,7 +282,16 @@ class MyAgent(object):
         #         self.settings_if.lookup[idx].value = self.default_params[r_idx]
         #         self.settings_if.SendSetting(idx)
         #         print("UNSAME: params[%d] = %d" % (idx, self.settings_if.lookup[idx].value))        
-            
+
+    def print_params(self):
+        for idx in self.param_idx:
+            r_idx = idx - self.param_idx[0]
+            # print("r_idx = %d" % r_idx)
+            # print(self.settings_if.lookup[idx].value, )
+            sys.stdout.write("%s, " % self.settings_if.lookup[idx].value)
+            sys.stdout.write("%s, " % self.onboard_params[r_idx])
+        sys.stdout.write("\n")
+        
     def objective(self, params):
         print("params:", params)
         pygame.mixer.music.play()
@@ -230,31 +304,37 @@ class MyAgent(object):
         # play sound
         
         # suggest new setting
-        for idx in self.param_idx:
-            r_idx = idx - self.param_idx[0]
-            print("r_idx = %d" % r_idx)
-            self.settings_if.lookup[idx].value = params[r_idx]
-            print("params[%d] = %d" % (idx, self.settings_if.lookup[idx].value))
-            # 850 + np.random.randint(10)
-            # send setting to autopilot
-            self.settings_if.SendSetting(idx)
+        self.desired_params = params
+        for i in range(3):
+            self.set_params_cont()
+            # time.sleep(0.1)
+        
+        # for idx in self.param_idx:
+        #     r_idx = idx - self.param_idx[0]
+        #     # print("r_idx = %d" % r_idx)
+        #     # self.settings_if.lookup[idx].value = params[r_idx]
+        #     # print("params[%d] = %d" % (idx, self.settings_if.lookup[idx].value))
+        #     # 850 + np.random.randint(10)
+        #     # send setting to autopilot
+        #     # self.settings_if.SendSetting(idx)
+        #     self.set_param(idx, int(params[r_idx]))
+            
         # tell agent about new setting
         self.cnt_setting += 1
         # evaluate
         self.active = True
         # print(objective)
         while self.active:
+            # continuously set parameters
+            self.set_params_cont()
+            self.print_params()
             time.sleep(1.)
 
         while self.safety:
             time.sleep(1)
             print("Waiting for safety")
-            for idx in self.param_idx:
-                r_idx = idx - self.param_idx[0]
-                # print("r_idx = %d" % r_idx)
-                # print(self.settings_if.lookup[idx].value, )
-                sys.stdout.write("%s, " % self.settings_if.lookup[idx].value)
-            sys.stdout.write("\n")
+            self.set_params_cont()
+            self.print_params()
             
         # compute cost
         # premature termination gives max cost
@@ -387,7 +467,7 @@ def main(args):
 
     # set telemetry mode to attitude loop
     # a.settings_if.lookup[0].value = 7  # attitude_loop
-    a.settings_if.lookup[0].value = 14 # attitude_tune_x75
+    a.settings_if.lookup[0].value = 12 # attitude_tune_x75
     # send setting to autopilot
     a.settings_if.SendSetting(0)
 
