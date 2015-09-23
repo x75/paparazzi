@@ -22,6 +22,12 @@ import tables as tb
 from paramopt_data import PPRZ_Opt_Attitude
 
 import pygame
+
+# hyperopt stuff
+from hyperopt import hp, fmin, tpe, Trials, rand, STATUS_OK, STATUS_FAIL, anneal
+import hp_gpsmbo.hpsuggest
+from hp_gpsmbo import suggest_algos
+from functools import partial
     
 # class MyAgent(IvyServer):
 class MyAgent(object):
@@ -56,7 +62,7 @@ class MyAgent(object):
         self.cnt_eval = 0 # count number of evaluations of cost
         self.cnt_time = 0
         self.cnt_setting = 0
-        self.maxsamp = 500
+        self.maxsamp = 200
         self.numdata = 3 * 2 + 6 # sp, ref, measurement * 2 for attitude + 6 RC channels
         self.logdata = np.zeros((self.maxsamp, self.numdata))
 
@@ -292,17 +298,61 @@ class MyAgent(object):
             sys.stdout.write("%s, " % self.onboard_params[r_idx])
         sys.stdout.write("\n")
         
+    def clean_logdata(self, logdata):
+        rows, cols = logdata.shape
+        for j in range(cols):
+            for i in range(1, rows):
+                if logdata[i,j] == 0.:
+                    logdata[i,j] = logdata[i-1,j]
+        return logdata
+                    
     def objective(self, params):
+        print("############################################################")
+        print("cnt %d" % (self.cnt_eval))
+        self.cnt_eval += 1
         print("params:", params)
-        pygame.mixer.music.play()
+        
+        # # FIXME: if symmetry hack
+        # params_new = (params[0], params[1], params[2], params[3],
+        #               params[0], params[1], params[2], params[3])
+        # params = params_new
+        
         # 29, 30, 31, 32, 33, 34, 35, 36
         assert(len(params) == len(self.default_params))
+        # status
+        status = STATUS_FAIL
         # reset counter
         self.cnt_time = 0
         # reet logdata
         self.logdata[:,:] = 0.
         # play sound
+
+        # check for existing data
+        # print("query tuple", tuple([params[i] for i in range(8)]))
+        query = """(pgain_phi == %d) & (dgain_p == %d) & \
+        (igain_phi == %d) & (ddgain_p == %d) & \
+        (pgain_theta == %d) & (dgain_q == %d) & \
+        (igain_theta == %d) & (ddgain_q == %d)""" % tuple([params[i] for i in range(8)])
+        print("query = %s" % (query))
+        existing_run_data = \
+        [ (x["pgain_phi"],   x["igain_phi"],   x["dgain_p"], x["ddgain_p"],
+           x["pgain_theta"], x["igain_theta"], x["dgain_q"], x["ddgain_q"],
+           x["mse"]) for x in self.table.where(query)]
+
+        print("existing_run_data", existing_run_data)
+
+        # FIXME: if mode manual        
+        if len(existing_run_data) > 0:
+            cost = existing_run_data[-1][-1]
+            print("reusing existing run data: mse = %f" % (cost))
+            status = STATUS_OK
+            time.sleep(0.1)
+            # return cost
+            return {"loss": cost, "status": status, "loss_variance": 6.}
         
+
+        # play sound when starting new eval
+        pygame.mixer.music.play()
         # suggest new setting
         self.desired_params = params
         for i in range(3):
@@ -331,11 +381,14 @@ class MyAgent(object):
             time.sleep(1.)
 
         while self.safety:
-            time.sleep(1)
             print("Waiting for safety")
             self.set_params_cont()
             self.print_params()
-            
+            time.sleep(1)
+
+        # clean logdata
+        self.clean_logdata(self.logdata)
+        
         # compute cost
         # premature termination gives max cost
         if self.cnt_time != self.maxsamp:
@@ -343,7 +396,11 @@ class MyAgent(object):
             cost = 1e4
         else:
             # compute cost: mean squared error of ref and est
-            cost = np.mean(np.square(self.logdata[:,1] - self.logdata[:,2]))
+            c_phi   = np.mean(np.square(self.logdata[:,1] - self.logdata[:,2]))
+            c_theta = np.mean(np.square(self.logdata[:,4] - self.logdata[:,5]))
+            # FIXME: include p,q cost
+            cost = c_phi + c_theta
+            status = STATUS_OK
 
         # save data to pytable
         ts = time.strftime("%Y%m%d%H%M%S")
@@ -377,12 +434,14 @@ class MyAgent(object):
         pl.show()
         pl.draw()
         print("cost = %f" % cost)
-        time.sleep(1.)
-        return cost
-
+        # time.sleep(1.)
+        # return cost
+        return {"loss": cost, "status": status, "loss_variance": 6.}
+    
 def main_loop_manual(args, a):
     # manual testing main loop
-    while True:
+    # while True:
+    for i in range(int(args.maxeval)):
         print("Starting episode")
         # print("Setting Att Loop pgain phi(%d) = %f" % (38, a.settings_if.lookup[38].value))
         # read current settings
@@ -398,35 +457,69 @@ def main_loop_manual(args, a):
             90 + np.random.randint(20),
             140 + np.random.randint(20),
         )
+        params = a.default_params
         cost = a.objective(params)
-        print("cost %f" % cost)
+        print("cost %f" % cost["loss"])
         # a.interface.stop()
-        time.sleep(5.)
+        time.sleep(3.)
         # a.interface.start()
+    a.shutdown_handler(15, 0)
 
 def main_loop_hyperopt(args, a):
     # hyperopt main loop
-    from hyperopt import hp, fmin, tpe, Trials, rand
+    # full space
+    # space = [
+    #     hp.quniform("pgain_phi", 10, 1000, 1),
+    #     hp.quniform("dgain_p", 0, 500, 1),
+    #     hp.quniform("igain_phi", 0, 400, 1),
+    #     hp.quniform("ddgain_p", 10, 500, 1),
+    #     hp.quniform("pgain_theta", 10, 1000, 1),
+    #     hp.quniform("dgain_q", 0, 500, 1),
+    #     hp.quniform("igain_theta", 0, 400, 1),
+    #     hp.quniform("ddgain_q", 10, 500, 1),
+    #     ]
+    # restricted space
     space = [
-        hp.quniform("pgain_phi", 5, 60, 1),
-        hp.quniform("dgain_p", 0, 100, 1),
-        hp.quniform("igain_phi", 5, 120, 1),
-        hp.quniform("ddgain_p", 20, 70, 1),
-        hp.quniform("pgain_theta", 5, 60, 1),
-        hp.quniform("dgain_q", 0, 100, 1),
-        hp.quniform("igain_theta", 5, 120, 1),
-        hp.quniform("ddgain_q", 20, 70, 1),
+        hp.quniform("pgain_phi", 100, 500, 1),
+        hp.quniform("dgain_p", 150, 500, 1),
+        hp.quniform("igain_phi", 10, 200, 1),
+        hp.quniform("ddgain_p", 10, 300, 1),
+        hp.quniform("pgain_theta", 100, 500, 1),
+        hp.quniform("dgain_q", 150, 500, 1),
+        hp.quniform("igain_theta", 10, 200, 1),
+        hp.quniform("ddgain_q", 10, 300, 1)
         ]
+    
+    # # more retricted space / symmetry hack
+    # space = [
+    #     hp.quniform("pgain", 100, 600, 1),
+    #     hp.quniform("dgain", 150, 600, 1),
+    #     hp.quniform("igain", 10, 250, 1),
+    #     hp.quniform("ddgain", 10, 300, 1)
+    #     ]
         
     trials = Trials()
-    if args.mode == "hpo_rand":
-        best = fmin(a.objective, space, algo=rand.suggest, max_evals=int(args.maxeval), trials=trials)
-    elif args.mode == "hpo_tpe":
-        best = fmin(a.objective, space, algo=tpe.suggest, max_evals=int(args.maxeval), trials=trials)
-    elif args.mode == "hpo_gp":
-        print("implement gp_smbo here")
-        # best = fmin(a.objective, space, algo=tpe.suggest, max_evals=int(args.maxeval), trials=trials)
+    if args.mode == "hpo_tpe":
+        suggest = tpe.suggest
+    elif args.mode == "hpo_anneal":
+        suggest = anneal.suggest
+    elif args.mode == "hpo_gp_ucb":
+        suggest = partial(suggest_algos.ucb, stop_at=1.)
+        suggest = suggest
+    elif args.mode == "hpo_gp_ei":
+        suggest = partial(suggest_algos.ei, stop_at=1.)
+        suggest = suggest
+    else: # hpo_rand
+        suggest = rand.suggest
+
+    best = fmin(a.objective,
+                space,
+                algo=suggest,
+                max_evals=int(args.maxeval),
+                rstate=np.random.RandomState(10), # 1, 10, 123, 
+                trials=trials)
     print("best", best)
+    a.shutdown_handler(15, 0)
     
 def main(args):
     print("main:", args)
