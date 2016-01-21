@@ -388,7 +388,13 @@ class MyAgent(object):
 
         # clean logdata
         self.clean_logdata(self.logdata)
-        
+
+
+        # reset params to default while waiting for next run
+        self.desired_params = self.default_params
+        for i in range(3):
+            self.set_params_cont()
+                
         # compute cost
         # premature termination gives max cost
         if self.cnt_time != self.maxsamp:
@@ -516,7 +522,7 @@ def main_loop_hyperopt(args, a):
                 space,
                 algo=suggest,
                 max_evals=int(args.maxeval),
-                rstate=np.random.RandomState(10), # 1, 10, 123, 
+                rstate=np.random.RandomState(123), # 1, 10, 123, 
                 trials=trials)
     print("best", best)
     a.shutdown_handler(15, 0)

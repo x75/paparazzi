@@ -174,13 +174,43 @@
     <!-- <define name="MAG_Y_SENS" value="3.20928435476" integer="16"/> -->
     <!-- <define name="MAG_Z_SENS" value="4.07291719636" integer="16"/> -->
 
-    <!-- calibration rothspalk -->
-    <define name="MAG_X_NEUTRAL" value="4"/>
-    <define name="MAG_Y_NEUTRAL" value="125"/>
-    <define name="MAG_Z_NEUTRAL" value="-1"/>
-    <define name="MAG_X_SENS" value="3.45222037424" integer="16"/>
-    <define name="MAG_Y_SENS" value="3.4215796733" integer="16"/>
-    <define name="MAG_Z_SENS" value="3.80450265396" integer="16"/>
+    <!-- rothspalk old / 2014 -->
+    <!-- <define name="MAG_X_NEUTRAL" value="4"/> -->
+    <!-- <define name="MAG_Y_NEUTRAL" value="125"/> -->
+    <!-- <define name="MAG_Z_NEUTRAL" value="-1"/> -->
+    <!-- <define name="MAG_X_SENS" value="3.45222037424" integer="16"/> -->
+    <!-- <define name="MAG_Y_SENS" value="3.4215796733" integer="16"/> -->
+    <!-- <define name="MAG_Z_SENS" value="3.80450265396" integer="16"/> -->
+
+    <!-- rothspalk halle 1 -->
+    <!-- <define name="MAG_X_NEUTRAL" value="28"/> -->
+    <!-- <define name="MAG_Y_NEUTRAL" value="-281"/> -->
+    <!-- <define name="MAG_Z_NEUTRAL" value="-204"/> -->
+    <!-- <define name="MAG_X_SENS" value="3.29628040366" integer="16"/> -->
+    <!-- <define name="MAG_Y_SENS" value="3.30882820323" integer="16"/> -->
+    <!-- <define name="MAG_Z_SENS" value="3.67428552595" integer="16"/> -->
+    <!-- rothspalk outside 1 -->
+    <!-- <define name="MAG_X_NEUTRAL" value="39"/> -->
+    <!-- <define name="MAG_Y_NEUTRAL" value="-202"/> -->
+    <!-- <define name="MAG_Z_NEUTRAL" value="-178"/> -->
+    <!-- <define name="MAG_X_SENS" value="3.32794850712" integer="16"/> -->
+    <!-- <define name="MAG_Y_SENS" value="2.99799164625" integer="16"/> -->
+    <!-- <define name="MAG_Z_SENS" value="3.53878400372" integer="16"/> -->
+    <!-- rothspalk outside 2 -->
+    <!-- <define name="MAG_X_NEUTRAL" value="32"/> -->
+    <!-- <define name="MAG_Y_NEUTRAL" value="-275"/> -->
+    <!-- <define name="MAG_Z_NEUTRAL" value="-199"/> -->
+    <!-- <define name="MAG_X_SENS" value="3.3071728252" integer="16"/> -->
+    <!-- <define name="MAG_Y_SENS" value="3.28340730884" integer="16"/> -->
+    <!-- <define name="MAG_Z_SENS" value="3.59872850577" integer="16"/> -->
+
+    <!-- rothspalk averaged over above -->
+    <define name="MAG_X_NEUTRAL" value="33"/>
+    <define name="MAG_Y_NEUTRAL" value="-253"/>
+    <define name="MAG_Z_NEUTRAL" value="-194"/>
+    <define name="MAG_X_SENS" value="3.31046724533" integer="16"/>
+    <define name="MAG_Y_SENS" value="3.19674238611" integer="16"/>
+    <define name="MAG_Z_SENS" value="3.60393267848" integer="16"/>
 
 <!-- where is this? -->
 <!-- <define name="MAG_X_NEUTRAL" value="-295"/> -->
@@ -266,7 +296,7 @@
     <define name="SP_MAX_THETA"   value="45." unit="deg"/>
     <!-- <define name="SP_MAX_R"       value="90." unit="deg/s"/> -->
     <!-- try increasing that for more yaw oomph -->
-    <define name="SP_MAX_R"       value="360." unit="deg/s"/>
+    <define name="SP_MAX_R"       value="720." unit="deg/s"/>
     <define name="DEADBAND_A"     value="0"/>
     <define name="DEADBAND_E"     value="0"/>
     <define name="DEADBAND_R"     value="250"/>
@@ -323,22 +353,81 @@
     <!-- <define name="THETA_DDGAIN" value="160"/> -->
     <!-- <define name="PSI_DDGAIN"   value="250"/> -->
 
+    <!-- optim -->
+<!-- best five [ -->
+<!-- [ 493.          167.          402.          225. -->
+<!--   487.           14.          282.          252. -->
+<!--   4.60459709] -->
+
+<!-- [ 449.          154.          360.          273. -->
+<!--   454.           51.          189.          239. -->
+<!--   4.88660908] -->
+
+<!-- [ 472.          156.          352.          287. -->
+<!--   445.           40.          242.          299. -->
+<!--   5.65769386] -->
+
+<!-- [ 446.          161.          499.          177. -->
+<!--   452.           34.          340.          165. -->
+<!--   5.81373215] -->
+
+<!-- [ 397.          133.          361.          189. -->
+<!--   481.           62.          289.          206. -->
+<!--   5.83702564]] -->
+
+<!-- best five [ -->
+<!-- [ 470.           93.          229.           38. -->
+<!--   450.           97.          440.          103. -->
+<!--   6.70843506] -->
+
+<!-- [ 420.           44.          373.          116. -->
+<!--   377.          184.          273.          122. -->
+<!--   7.20793962] -->
+
+<!-- [ 351.           72.          479.          167. -->
+<!--   467.           83.          459.           59. -->
+<!--   7.30009747] -->
+
+<!-- [ 393.           78.          498.           10. -->
+<!--   321.           56.          403.          219. -->
+<!--   7.89704275] -->
+
+<!-- [ 479.           33.          211.          157. -->
+<!--   461.          115.          392.           55. -->
+<!--   7.92410517]] -->
+
+
+<!--     <define name="PHI_PGAIN" value="300"/> -->
+<!--     <define name="PHI_DGAIN" value="350"/> -->
+<!--     <define name="PHI_IGAIN" value="100"/> -->
+<!--     <\!-- feedforward -\-> -->
+<!--     <define name="PHI_DDGAIN" value="150"/> -->
+
+<!--     <define name="THETA_PGAIN" value="300"/> -->
+<!--     <define name="THETA_DGAIN" value="350"/> -->
+<!--     <define name="THETA_IGAIN" value="100"/> -->
+<!--     <\!-- feedforward -\-> -->
+<!--     <define name="THETA_DDGAIN" value="150"/> -->
+
+    <!-- manually tuned -->
     <define name="PHI_PGAIN" value="300"/>
     <define name="PHI_DGAIN" value="350"/>
     <define name="PHI_IGAIN" value="100"/>
+    <!-- feedforward -->
+    <define name="PHI_DDGAIN" value="150"/>
 
     <define name="THETA_PGAIN" value="300"/>
     <define name="THETA_DGAIN" value="350"/>
     <define name="THETA_IGAIN" value="100"/>
+    <!-- feedforward -->
+    <define name="THETA_DDGAIN" value="150"/>
 
     <define name="PSI_PGAIN" value="210"/>
     <define name="PSI_DGAIN" value="400"/>
     <define name="PSI_IGAIN" value="40"/>
-
     <!-- feedforward -->
-    <define name="PHI_DDGAIN" value="150"/>
-    <define name="THETA_DDGAIN" value="150"/>
     <define name="PSI_DDGAIN" value="61"/>
+
 
   </section>
 
