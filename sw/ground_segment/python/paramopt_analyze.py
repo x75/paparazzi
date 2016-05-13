@@ -525,7 +525,7 @@ if __name__ == "__main__":
     parser.add_argument('-l', "--logfiles", action='append', dest='logfiles',
                         default=[], nargs = "+",
                         help='Add logfiles for analysis')
-    parser.add_argument("-m", "--mode", dest="mode", help="Mode, one of " + ", ".join(modes.keys()), default="plot_timeseries")
+    parser.add_argument("-m", "--mode", dest="mode", help="Mode, one of " + ", ".join(modes.keys()), default="plot_mse")
     parser.add_argument('-ps', "--plotsave", action='store_true', help='Save plot to pdf?')
     parser.add_argument('-s', "--sorted", dest="sorted",
                         action='store_true', help='Sort table by MSE')

@@ -1,0 +1,174 @@
+<!DOCTYPE flight_plan SYSTEM "flight_plan.dtd">
+
+<flight_plan alt="130" ground_alt="52" lat0="53.7092804" lon0="12.4429453" max_dist_from_home="100" name="Rotorcraft Basic X75 Lisa Rothspalk Haus" security_height="2">
+  <header>
+#include "autopilot.h"
+</header>
+  <waypoints>
+    <waypoint name="HOME" x="0" y="0"/>
+    <waypoint name="CLIMB" x="3.0" y="4.5"/>
+    <waypoint name="STDBY" x="7.0" y="7.4"/>
+    <waypoint name="S1" x="-11.6" y="12.7"/>
+    <waypoint name="p01" x="-17.1" y="9.9"/>
+    <waypoint name="p02" x="-3.7" y="-1.5"/>
+    <waypoint name="S2" x="12.1" y="-7.7"/>
+    <waypoint name="p03" x="6.0" y="-12.5"/>
+    <waypoint name="p04" x="16.0" y="-2.0"/>
+    <waypoint name="p05" x="-10.0" y="19.2"/>
+    <waypoint name="p06" x="-2.9" y="29.1"/>
+    <waypoint name="p07" x="13.2" y="15.9"/>
+    <waypoint name="p08" x="24.0" y="6.6"/>
+    <waypoint name="p09" x="32.1" y="15.4"/>
+    <waypoint name="p10" x="20.4" y="25.7"/>
+    <waypoint name="p11" x="6.6" y="38.2"/>
+    <waypoint name="p12" x="14.1" y="46.6"/>
+    <waypoint name="p13" x="28.3" y="34.0"/>
+    <waypoint name="p14" x="39.1" y="23.7"/>
+    <waypoint name="p15" x="46.8" y="32.8"/>
+    <waypoint name="p16" x="35.8" y="42.8"/>
+    <waypoint name="p17" x="22.9" y="53.9"/>
+    <waypoint name="p18" x="31.8" y="61.0"/>
+    <waypoint name="p19" x="43.8" y="51.4"/>
+    <waypoint name="p20" x="55.6" y="44.1"/>
+    <waypoint name="p21" x="63.3" y="52.9"/>
+    <waypoint name="p22" x="52.3" y="61.9"/>
+    <waypoint name="p23" x="42.0" y="69.7"/>
+    <waypoint name="CAM" x="20.5" y="31.7"/>
+    <waypoint name="TD" x="-3.3" y="9.6"/>
+  </waypoints>
+  <blocks>
+    <block name="Wait GPS">
+      <call fun="NavKillThrottle()"/>
+      <while cond="!GpsFixValid()"/>
+    </block>
+    <block name="Geo init">
+      <while cond="LessThan(NavBlockTime(), 10)"/>
+      <call fun="NavSetGroundReferenceHere()"/>
+    </block>
+    <block name="Holding point">
+      <call fun="NavKillThrottle()"/>
+      <attitude pitch="0" roll="0" throttle="0" until="FALSE" vmode="throttle"/>
+    </block>
+    <block name="Start Engine">
+      <call fun="NavResurrect()"/>
+      <attitude pitch="0" roll="0" throttle="0" until="FALSE" vmode="throttle"/>
+    </block>
+    <block name="Takeoff" strip_button="Takeoff" strip_icon="takeoff.png">
+      <exception cond="stateGetPositionEnu_f()->z > 2.0" deroute="Standby"/>
+      <call fun="NavSetWaypointHere(WP_CLIMB)"/>
+      <stay climb="0.5" vmode="climb" wp="CLIMB"/>
+    </block>
+    <block name="Standby" strip_button="Standby" strip_icon="home.png">
+      <stay wp="STDBY"/>
+    </block>
+    <block name="stay_p01">
+      <stay wp="p01"/>
+    </block>
+    <block name="go_p02">
+      <call fun="nav_set_heading_deg(90)"/>
+      <go wp="p02"/>
+      <deroute block="stay_p01"/>
+    </block>
+    <block name="line_p01_p02">
+      <go from="p01" hmode="route" wp="p02"/>
+      <stay until="stage_time>10" wp="p02"/>
+      <go from="p02" hmode="route" wp="p01"/>
+      <deroute block="stay_p01"/>
+    </block>
+    <block name="route_test">
+      <go from="p01" hmode="route" wp="p02"/>
+      <stay until="stage_time>10" wp="p02"/>
+      <go from="p02" hmode="route" wp="p03"/>
+      <stay until="stage_time>10" wp="p03"/>
+      <go from="p03" hmode="route" wp="p04"/>
+      <stay until="stage_time>10" wp="p04"/>
+      <go from="p04" hmode="route" wp="p01"/>
+      <deroute block="stay_p01"/>
+    </block>
+    <block name="route_survey_haus">
+      <go from="STDBY" hmode="route" wp="p01"/>
+      <stay until="stage_time>10" wp="p01"/>
+      <go from="p01" hmode="route" wp="p02"/>
+      <stay until="stage_time>10" wp="p02"/>
+      <go from="p02" hmode="route" wp="p03"/>
+      <stay until="stage_time>10" wp="p03"/>
+      <go from="p03" hmode="route" wp="p04"/>
+      <stay until="stage_time>10" wp="p04"/>
+      <go from="p04" hmode="route" wp="p05"/>
+      <stay until="stage_time>10" wp="p05"/>
+      <go from="p05" hmode="route" wp="p06"/>
+      <stay until="stage_time>10" wp="p06"/>
+      <go from="p06" hmode="route" wp="p07"/>
+      <stay until="stage_time>10" wp="p07"/>
+      <go from="p07" hmode="route" wp="p08"/>
+      <stay until="stage_time>10" wp="p08"/>
+      <go from="p08" hmode="route" wp="p09"/>
+      <stay until="stage_time>10" wp="p09"/>
+      <go from="p09" hmode="route" wp="p10"/>
+      <stay until="stage_time>10" wp="p10"/>
+      <go from="p10" hmode="route" wp="p11"/>
+      <stay until="stage_time>10" wp="p11"/>
+      <go from="p11" hmode="route" wp="p12"/>
+      <stay until="stage_time>10" wp="p12"/>
+      <go from="p12" hmode="route" wp="p13"/>
+      <stay until="stage_time>10" wp="p13"/>
+      <go from="p13" hmode="route" wp="p14"/>
+      <stay until="stage_time>10" wp="p14"/>
+      <go from="p14" hmode="route" wp="p15"/>
+      <stay until="stage_time>10" wp="p15"/>
+      <go from="p15" hmode="route" wp="p16"/>
+      <stay until="stage_time>10" wp="p16"/>
+      <go from="p16" hmode="route" wp="p17"/>
+      <stay until="stage_time>10" wp="p17"/>
+      <go from="p17" hmode="route" wp="p18"/>
+      <stay until="stage_time>10" wp="p18"/>
+      <go from="p18" hmode="route" wp="p19"/>
+      <stay until="stage_time>10" wp="p19"/>
+      <go from="p19" hmode="route" wp="p20"/>
+      <stay until="stage_time>10" wp="p20"/>
+      <go from="p20" hmode="route" wp="p21"/>
+      <stay until="stage_time>10" wp="p21"/>
+      <go from="p21" hmode="route" wp="p22"/>
+      <stay until="stage_time>10" wp="p22"/>
+      <go from="p22" hmode="route" wp="p23"/>
+      <stay until="stage_time>10" wp="p23"/>
+      <go from="p23" hmode="route" wp="p01"/>
+      <deroute block="stay_p01"/>
+    </block>
+
+    <block group="extra_pattern" name="Survey S1-S2 25m NS" strip_button="Svy25-NS-PRIMITIVE">
+      <survey_rectangle grid="5" orientation="NS" wp1="S1" wp2="S2"/>
+    </block>
+    <block group="extra_pattern" name="Survey S1-S2 NS" strip_button="Svy-NS" strip_icon="survey.png">
+      <call fun="nav_survey_rectangle_rotorcraft_setup(WP_S1, WP_S2, sweep, NS)"/>
+      <deroute block="Survey RECTANGLE RUN"/>
+    </block>
+    <block group="extra_pattern" name="Survey S1-S2 LO" strip_button="Svy-LO" strip_icon="survey_we.png">
+      <call fun="nav_survey_rectangle_rotorcraft_setup(WP_S1, WP_S2, sweep, WE)"/>
+      <deroute block="Survey RECTANGLE RUN"/>
+    </block>
+    <block group="extra_pattern" name="Survey RECTANGLE RUN" strip_button="Svy CONT">
+      <exception cond="rectangle_survey_sweep_num > 1" deroute="Standby"/>
+      <call fun="nav_survey_rectangle_rotorcraft_run(WP_S1, WP_S2)"/>
+    </block>
+
+    <block name="circle CAM" pre_call="nav_set_heading_towards_waypoint(WP_CAM)">
+      <circle radius="nav_radius" wp="CAM"/>
+    </block>
+    <block name="land here" strip_button="Land Here" strip_icon="land-right.png">
+      <call fun="NavSetWaypointHere(WP_TD)"/>
+    </block>
+    <block name="land">
+      <go wp="TD"/>
+    </block>
+    <block name="flare">
+      <exception cond="NavDetectGround()" deroute="Holding point"/>
+      <exception cond="!nav_is_in_flight()" deroute="landed"/>
+      <call fun="NavStartDetectGround()"/>
+      <stay climb="-0.8" vmode="climb" wp="TD"/>
+    </block>
+    <block name="landed">
+      <attitude pitch="0" roll="0" throttle="0" until="FALSE" vmode="throttle"/>
+    </block>
+  </blocks>
+</flight_plan>

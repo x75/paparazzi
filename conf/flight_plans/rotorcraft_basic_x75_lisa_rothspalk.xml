@@ -1,21 +1,19 @@
 <!DOCTYPE flight_plan SYSTEM "flight_plan.dtd">
 
-<flight_plan alt="480" ground_alt="467.56" lat0="43.940841" lon0="3.5948859" max_dist_from_home="40" name="Rotorcraft Basic (x75/mdc)" security_height="2">
+<flight_plan alt="60" ground_alt="52" lat0="53.70818" lon0="12.43888" max_dist_from_home="80" name="Rotorcraft Basic X75 Lisa Rothspalk" security_height="2">
   <header>
 #include "autopilot.h"
 </header>
   <waypoints>
-    <waypoint name="HOME" x="0" y="0"/>
-    <waypoint name="CLIMB" x="-4.3" y="1.9"/>
-    <waypoint name="STDBY" x="-3.2" y="6.6"/>
-    <waypoint name="p01" x="-7.1" y="18.3"/>
-    <waypoint name="p02" x="2.8" y="37.1"/>
-    <waypoint name="p03" x="11.1" y="32.3"/>
-    <waypoint name="p04" x="1.4" y="15.2"/>
-    <waypoint name="p05" x="10.8" y="10.5"/>
-    <waypoint name="p06" x="18.5" y="26.5"/>
-    <waypoint name="CAM" x="-15.6" y="-31.9"/>
-    <waypoint name="TD" x="1.8" y="4.4"/>
+    <waypoint name="HOME" x="0.0" y="0.0"/>
+    <waypoint name="CLIMB" x="-3.2" y="-2.6"/>
+    <waypoint name="STDBY" x="-5.8" y="-5.6"/>
+    <waypoint name="p1" x="-20.0" y="-0.8"/>
+    <waypoint name="p2" x="-0.7" y="-21.2"/>
+    <waypoint name="p3" x="-17.7" y="-35.6"/>
+    <waypoint name="p4" x="-36.3" y="-14.7"/>
+    <waypoint name="CAM" x="-18.4" y="-16.5"/>
+    <waypoint name="TD" x="2.3" y="-7.0"/>
   </waypoints>
   <blocks>
     <block name="Wait GPS">
@@ -43,44 +41,28 @@
       <stay wp="STDBY"/>
     </block>
     <block name="stay_p1">
-      <stay wp="p01"/>
+      <stay wp="p1"/>
     </block>
     <block name="go_p2">
       <call fun="nav_set_heading_deg(90)"/>
-      <go wp="p02"/>
+      <go wp="p2"/>
       <deroute block="stay_p1"/>
     </block>
     <block name="line_p1_p2">
-      <go from="p01" hmode="route" wp="p02"/>
-      <stay until="stage_time>10" wp="p02"/>
-      <go from="p02" hmode="route" wp="p01"/>
-      <deroute block="stay_p1"/>
-    </block>
-    <block name="route_x75">
-      <go from="p01" hmode="route" wp="p02"/>
-      <stay until="stage_time>4" wp="p02"/>
-      <go from="p02" hmode="route" wp="p03"/>
-      <stay until="stage_time>4" wp="p03"/>
-      <go from="p03" hmode="route" wp="p04"/>
-      <stay until="stage_time>4" wp="p04"/>
-      <go from="p04" hmode="route" wp="p05"/>
-      <stay until="stage_time>4" wp="p05"/>
-      <go from="p05" hmode="route" wp="p06"/>
-      <stay until="stage_time>4" wp="p06"/>
-      <go from="p06" hmode="route" wp="p01"/>
+      <go from="p1" hmode="route" wp="p2"/>
+      <stay until="stage_time>10" wp="p2"/>
+      <go from="p2" hmode="route" wp="p1"/>
       <deroute block="stay_p1"/>
     </block>
     <block name="route">
-      <go from="p01" hmode="route" wp="p03"/>
-      <go from="p03" hmode="route" wp="p04"/>
-      <go from="p04" hmode="route" wp="p01"/>
+      <go from="p1" hmode="route" wp="p2"/>
+      <go from="p2" hmode="route" wp="p3"/>
+      <go from="p3" hmode="route" wp="p4"/>
+      <go from="p4" hmode="route" wp="p1"/>
       <deroute block="stay_p1"/>
     </block>
     <block name="circle CAM" pre_call="nav_set_heading_towards_waypoint(WP_CAM)">
       <circle radius="nav_radius" wp="CAM"/>
-    </block>
-    <block name="circle CAM2">
-      <circle radius="10" wp="CAM"/>
     </block>
     <block name="land here" strip_button="Land Here" strip_icon="land-right.png">
       <call fun="NavSetWaypointHere(WP_TD)"/>

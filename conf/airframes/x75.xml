@@ -44,7 +44,7 @@
     <subsystem name="gps"           type="ublox"/>
     <subsystem name="stabilization" type="int_quat"/>
     <subsystem name="ahrs"          type="int_cmpl_quat">
-      <!-- <configure name="USE_MAGNETOMETER" value="TRUE"/> -->
+      <configure name="USE_MAGNETOMETER" value="TRUE"/>
       <define name="AHRS_GRAVITY_HEURISTIC_FACTOR" value="30"/>
     </subsystem>
     <subsystem name="ins"/>
@@ -59,6 +59,9 @@
     <load name="sys_mon.xml"/>
     <load name="gps_ubx_ucenter.xml"/>
     <load name="send_imu_mag_current.xml"/>
+   <load name="nav_survey_rectangle_rotorcraft.xml">
+      <define name="RECTANGLE_SURVEY_DEFAULT_SWEEP" value="10"/>
+    </load>
   </modules>
 
   <servos driver="Pwm">
@@ -204,24 +207,15 @@
     <!-- <define name="MAG_Y_SENS" value="3.28340730884" integer="16"/> -->
     <!-- <define name="MAG_Z_SENS" value="3.59872850577" integer="16"/> -->
 
-    <!-- rothspalk averaged over above -->
-    <define name="MAG_X_NEUTRAL" value="33"/>
-    <define name="MAG_Y_NEUTRAL" value="-253"/>
-    <define name="MAG_Z_NEUTRAL" value="-194"/>
-    <define name="MAG_X_SENS" value="3.31046724533" integer="16"/>
-    <define name="MAG_Y_SENS" value="3.19674238611" integer="16"/>
-    <define name="MAG_Z_SENS" value="3.60393267848" integer="16"/>
+    <!-- rothspalk averaged over above 201602 -->
+    <!-- <define name="MAG_X_NEUTRAL" value="33"/> -->
+    <!-- <define name="MAG_Y_NEUTRAL" value="-253"/> -->
+    <!-- <define name="MAG_Z_NEUTRAL" value="-194"/> -->
+    <!-- <define name="MAG_X_SENS" value="3.31046724533" integer="16"/> -->
+    <!-- <define name="MAG_Y_SENS" value="3.19674238611" integer="16"/> -->
+    <!-- <define name="MAG_Z_SENS" value="3.60393267848" integer="16"/> -->
 
-<!-- where is this? -->
-<!-- <define name="MAG_X_NEUTRAL" value="-295"/> -->
-<!-- <define name="MAG_Y_NEUTRAL" value="-196"/> -->
-<!-- <define name="MAG_Z_NEUTRAL" value="-166"/> -->
-<!-- <define name="MAG_X_SENS" value="3.27376708931" integer="16"/> -->
-<!-- <define name="MAG_Y_SENS" value="3.25784552567" integer="16"/> -->
-<!-- <define name="MAG_Z_SENS" value="3.68005074955" integer="16"/> -->
-
-
-    <!-- calibration mdc -->
+    <!-- calibration mdc 2015 -->
     <!-- <define name="MAG_X_NEUTRAL" value="55"/> -->
     <!-- <define name="MAG_Y_NEUTRAL" value="144"/> -->
     <!-- <define name="MAG_Z_NEUTRAL" value="-8"/> -->
@@ -229,6 +223,13 @@
     <!-- <define name="MAG_Y_SENS" value="3.64414657283" integer="16"/> -->
     <!-- <define name="MAG_Z_SENS" value="4.04501382675" integer="16"/> -->
 
+    <!-- calibration mdc 20160324 -->
+    <define name="MAG_X_NEUTRAL" value="-163"/>
+    <define name="MAG_Y_NEUTRAL" value="-35"/>
+    <define name="MAG_Z_NEUTRAL" value="-131"/>
+    <define name="MAG_X_SENS" value="3.49519444005" integer="16"/>
+    <define name="MAG_Y_SENS" value="3.52781068304" integer="16"/>
+    <define name="MAG_Z_SENS" value="3.88845908855" integer="16"/>
 
     <define name="BODY_TO_IMU_PHI"   value="0." unit="deg"/>
     <define name="BODY_TO_IMU_THETA" value="0." unit="deg"/>
@@ -239,9 +240,22 @@
     <!-- <define name="H_X" value="0.3770441"/> -->
     <!-- <define name="H_Y" value="0.0193986"/> -->
     <!-- <define name="H_Z" value="0.9259921"/> -->
-    <define name="H_X" value="0.3773202"/>
-    <define name="H_Y" value="0.0211099"/>
-    <define name="H_Z" value="0.92584223"/>
+
+    <!-- rothspalk 2016: 0.36247056,  0.02101846,  0.93175819 -->
+    <!-- unknown (berlin/rothspalk?) -->
+    <!-- <define name="H_X" value="0.3773202"/> -->
+    <!-- <define name="H_Y" value="0.0211099"/> -->
+    <!-- <define name="H_Z" value="0.92584223"/> -->
+
+    <!-- <\!-- mdc 20160329 -\-> -->
+    <!-- <define name="H_X" value="0.50568922"/> -->
+    <!-- <define name="H_Y" value="0.00832686"/> -->
+    <!-- <define name="H_Z" value="0.86267553"/> -->
+
+    <!-- rothspalk 20160410: 0.36247151,  0.02105809,  0.93175692 -->
+    <define name="H_X" value="0.36247151"/>
+    <define name="H_Y" value="0.02105809"/>
+    <define name="H_Z" value="0.93175692"/>
 
     <!-- include current calibration -->
   </section>
@@ -314,7 +328,7 @@
 
     <!-- <define name="REF_OMEGA_R"  value="250" unit="deg/s"/> -->
     <!-- <define name="REF_OMEGA_R"  value="350" unit="deg/s"/> -->
-    <define name="REF_OMEGA_R"  value="1080" unit="deg/s"/>
+    <define name="REF_OMEGA_R"  value="1200" unit="deg/s"/>
     <define name="REF_ZETA_R"   value="0.85"/>
     <!-- <define name="REF_MAX_R"    value="180." unit="deg/s"/> -->
     <define name="REF_MAX_R"    value="1200." unit="deg/s"/>
@@ -396,18 +410,31 @@
 <!--   461.          115.          392.           55. -->
 <!--   7.92410517]] -->
 
+<!-- from paramopt_ppz_v2_gp_ucb_4D_2.h5 -->
+<!-- best five [ -->
+<!-- x [ 533.           91.          503.          171. -->
+<!--   533.           91.          503.          171.            3.68272543] -->
+<!-- x [ 600.          186.          412.          250. -->
+<!--   600.          186.          412.          250.            4.59505129] -->
+<!-- [ 355.          148.          600.          214. -->
+<!--   355.          148.          600.          214.            4.73558807] -->
+<!-- [ 417.          143.          564.          227. -->
+<!--   417.          143.          564.          227.            5.52406597] -->
+<!-- [ 478.          188.          557.          234. -->
+<!--   478.          188.          557.          234.            5.60350132]] -->
 
-<!--     <define name="PHI_PGAIN" value="300"/> -->
-<!--     <define name="PHI_DGAIN" value="350"/> -->
-<!--     <define name="PHI_IGAIN" value="100"/> -->
-<!--     <\!-- feedforward -\-> -->
-<!--     <define name="PHI_DDGAIN" value="150"/> -->
+<!-- optimized -->
+    <!-- <define name="PHI_PGAIN" value="355"/> -->
+    <!-- <define name="PHI_DGAIN" value="148"/> -->
+    <!-- <define name="PHI_IGAIN" value="600"/> -->
+    <!-- <\!-- feedforward -\-> -->
+    <!-- <define name="PHI_DDGAIN" value="214"/> -->
 
-<!--     <define name="THETA_PGAIN" value="300"/> -->
-<!--     <define name="THETA_DGAIN" value="350"/> -->
-<!--     <define name="THETA_IGAIN" value="100"/> -->
-<!--     <\!-- feedforward -\-> -->
-<!--     <define name="THETA_DDGAIN" value="150"/> -->
+    <!-- <define name="THETA_PGAIN" value="355"/> -->
+    <!-- <define name="THETA_DGAIN" value="148"/> -->
+    <!-- <define name="THETA_IGAIN" value="600"/> -->
+    <!-- <\!-- feedforward -\-> -->
+    <!-- <define name="THETA_DDGAIN" value="214"/> -->
 
     <!-- manually tuned -->
     <define name="PHI_PGAIN" value="300"/>
@@ -422,11 +449,17 @@
     <!-- feedforward -->
     <define name="THETA_DDGAIN" value="150"/>
 
-    <define name="PSI_PGAIN" value="210"/>
-    <define name="PSI_DGAIN" value="400"/>
+    <define name="PSI_PGAIN" value="460"/>
+    <define name="PSI_DGAIN" value="210"/>
     <define name="PSI_IGAIN" value="40"/>
     <!-- feedforward -->
-    <define name="PSI_DDGAIN" value="61"/>
+    <define name="PSI_DDGAIN" value="110"/>
+
+    <!-- <define name="PSI_PGAIN" value="210"/> -->
+    <!-- <define name="PSI_DGAIN" value="400"/> -->
+    <!-- <define name="PSI_IGAIN" value="40"/> -->
+    <!-- <\!-- feedforward -\-> -->
+    <!-- <define name="PSI_DDGAIN" value="61"/> -->
 
 
   </section>
